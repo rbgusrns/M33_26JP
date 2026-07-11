@@ -210,11 +210,11 @@ void motor_vari_init(motor_axis_t *pm)
 {
     memset((void *)pm, 0, sizeof(motor_axis_t));
 
-    pm->accel = MOTOR_DEFAULT_ACCEL_MM_S2;
-    pm->decel = (g_int32decel > 0) ? (float)g_int32decel : MOTOR_DEFAULT_DECEL_MM_S2;
-    pm->handle = 1.0f;
-    pm->kp = (g_q28kp > 0.0f) ? g_q28kp : MOTOR_DEFAULT_KP;
-    pm->kd = (g_q28kd > 0.0f) ? g_q28kd : MOTOR_DEFAULT_KD;
+    pm->fp32_accel = MOTOR_DEFAULT_ACCEL_MM_S2;
+    pm->fp32_decel = (g_i32_decel > 0) ? (float)g_i32_decel : MOTOR_DEFAULT_DECEL_MM_S2;
+    pm->fp32_handle = 1.0f;
+    pm->fp32_kp = (g_fp32_motor_kp > 0.0f) ? g_fp32_motor_kp : MOTOR_DEFAULT_KP;
+    pm->fp32_kd = (g_fp32_motor_kd > 0.0f) ? g_fp32_motor_kd : MOTOR_DEFAULT_KD;
 }
 
 void motor_reset_motion_state(void)
@@ -222,39 +222,39 @@ void motor_reset_motion_state(void)
     motor_vari_init(&g_lm);
     motor_vari_init(&g_rm);
 
-    g_motor_feedback.left_delta = 0;
-    g_motor_feedback.right_delta = 0;
-    g_motor_feedback.left_count = 0;
-    g_motor_feedback.right_count = 0;
-    g_motor_feedback.tick_500us = 0U;
+    g_motor_feedback.i16_left_delta = 0;
+    g_motor_feedback.i16_right_delta = 0;
+    g_motor_feedback.i32_left_count = 0;
+    g_motor_feedback.i32_right_count = 0;
+    g_motor_feedback.u32_tick_500us = 0U;
     g_u32_motor_isr_cnt = 0U;
-    g_int32timer_cnt = 0;
+    g_i32_timer_cnt = 0;
 
     LL_TIM_SetCounter(TIM3, 0U);
     LL_TIM_SetCounter(TIM4, 0U);
 }
 
-void decel_dist_compute(float cur_vel, float tar_vel, float acc, float *decel_dist)
+void decel_dist_compute(float fp32_cur_vel, float tar_vel, float acc, float *fp32_decel_dist)
 {
     float denom;
 
-    if ((decel_dist == NULL) || (acc <= 0.0f)) {
+    if ((fp32_decel_dist == NULL) || (acc <= 0.0f)) {
         return;
     }
 
     denom = 2.0f * acc;
-    *decel_dist = motor_fabsf((cur_vel * cur_vel) - (tar_vel * tar_vel)) / denom;
+    *fp32_decel_dist = motor_fabsf((fp32_cur_vel * fp32_cur_vel) - (tar_vel * tar_vel)) / denom;
 }
 
-void diffvel_to_remaindist_cpt(float cur_vel, float tar_vel, float acc, float *decel_dist)
+void diffvel_to_remaindist_cpt(float fp32_cur_vel, float tar_vel, float acc, float *fp32_decel_dist)
 {
-    decel_dist_compute(cur_vel, tar_vel, acc, decel_dist);
+    decel_dist_compute(fp32_cur_vel, tar_vel, acc, fp32_decel_dist);
 }
 
-void max_vel_compute(float dist, float minus_dist, float cur_vel, float acc, float limit_vel, float min_vel, float *max_vel)
+void max_vel_compute(float dist, float minus_dist, float fp32_cur_vel, float acc, float limit_vel, float min_vel, float *max_vel)
 {
     float usable_dist;
-    float vel;
+    float fp32_vel;
 
     if ((max_vel == NULL) || (acc <= 0.0f)) {
         return;
@@ -265,9 +265,9 @@ void max_vel_compute(float dist, float minus_dist, float cur_vel, float acc, flo
         usable_dist = 0.0f;
     }
 
-    vel = motor_sqrtf((cur_vel * cur_vel) + (2.0f * acc * usable_dist));
-    vel = motor_clampf(vel, min_vel, limit_vel);
-    *max_vel = vel;
+    fp32_vel = motor_sqrtf((fp32_cur_vel * fp32_cur_vel) + (2.0f * acc * usable_dist));
+    fp32_vel = motor_clampf(fp32_vel, min_vel, limit_vel);
+    *max_vel = fp32_vel;
 }
 
 void move_to_move(float dist, float dec_dist, float tar_vel, float dec_vel, float acc)
@@ -275,23 +275,23 @@ void move_to_move(float dist, float dec_dist, float tar_vel, float dec_vel, floa
     uint32_t primask = __get_PRIMASK();
     __disable_irq();
 
-    g_rm.accel = acc;
-    g_lm.accel = acc;
-    g_rm.decel = (g_int32decel > 0) ? (float)g_int32decel : MOTOR_DEFAULT_DECEL_MM_S2;
-    g_lm.decel = g_rm.decel;
+    g_rm.fp32_accel = acc;
+    g_lm.fp32_accel = acc;
+    g_rm.fp32_decel = (g_i32_decel > 0) ? (float)g_i32_decel : MOTOR_DEFAULT_DECEL_MM_S2;
+    g_lm.fp32_decel = g_rm.fp32_decel;
 
-    g_rm.decel_dist = dec_dist;
-    g_lm.decel_dist = dec_dist;
-    g_rm.user_dist = dist;
-    g_lm.user_dist = dist;
-    g_rm.user_vel = tar_vel;
-    g_lm.user_vel = tar_vel;
-    g_rm.err_dist = g_rm.user_dist - g_rm.total_dist;
-    g_lm.err_dist = g_lm.user_dist - g_lm.total_dist;
-    g_rm.decel_vel = dec_vel;
-    g_lm.decel_vel = dec_vel;
-    g_rm.decel_flag = ON;
-    g_lm.decel_flag = ON;
+    g_rm.fp32_decel_dist = dec_dist;
+    g_lm.fp32_decel_dist = dec_dist;
+    g_rm.fp32_user_dist = dist;
+    g_lm.fp32_user_dist = dist;
+    g_rm.fp32_user_vel = tar_vel;
+    g_lm.fp32_user_vel = tar_vel;
+    g_rm.fp32_err_dist = g_rm.fp32_user_dist - g_rm.fp32_total_dist;
+    g_lm.fp32_err_dist = g_lm.fp32_user_dist - g_lm.fp32_total_dist;
+    g_rm.fp32_decel_vel = dec_vel;
+    g_lm.fp32_decel_vel = dec_vel;
+    g_rm.u16_decel_flag = ON;
+    g_lm.u16_decel_flag = ON;
     g_Flag.move_state = ON;
     g_Flag.motor = ON;
 
@@ -300,28 +300,28 @@ void move_to_move(float dist, float dec_dist, float tar_vel, float dec_vel, floa
     }
 }
 
-void move_to_end(float dist, float vel, float acc)
+void move_to_end(float dist, float fp32_vel, float acc)
 {
-    float decel_dist = 0.0f;
+    float fp32_decel_dist = 0.0f;
     uint32_t primask = __get_PRIMASK();
     __disable_irq();
 
-    diffvel_to_remaindist_cpt(vel, 0.0f, acc, &decel_dist);
+    diffvel_to_remaindist_cpt(fp32_vel, 0.0f, acc, &fp32_decel_dist);
 
-    g_rm.accel = acc;
-    g_lm.accel = acc;
-    g_rm.decel_dist = decel_dist;
-    g_lm.decel_dist = decel_dist;
-    g_rm.user_dist = dist;
-    g_lm.user_dist = dist;
-    g_rm.user_vel = vel;
-    g_lm.user_vel = vel;
-    g_rm.err_dist = g_rm.user_dist - g_rm.total_dist;
-    g_lm.err_dist = g_lm.user_dist - g_lm.total_dist;
-    g_rm.decel_vel = 0.0f;
-    g_lm.decel_vel = 0.0f;
-    g_rm.decel_flag = ON;
-    g_lm.decel_flag = ON;
+    g_rm.fp32_accel = acc;
+    g_lm.fp32_accel = acc;
+    g_rm.fp32_decel_dist = fp32_decel_dist;
+    g_lm.fp32_decel_dist = fp32_decel_dist;
+    g_rm.fp32_user_dist = dist;
+    g_lm.fp32_user_dist = dist;
+    g_rm.fp32_user_vel = fp32_vel;
+    g_lm.fp32_user_vel = fp32_vel;
+    g_rm.fp32_err_dist = g_rm.fp32_user_dist - g_rm.fp32_total_dist;
+    g_lm.fp32_err_dist = g_lm.fp32_user_dist - g_lm.fp32_total_dist;
+    g_rm.fp32_decel_vel = 0.0f;
+    g_lm.fp32_decel_vel = 0.0f;
+    g_rm.u16_decel_flag = ON;
+    g_lm.u16_decel_flag = ON;
     g_Flag.move_state = OFF;
     g_Flag.motor = ON;
 
@@ -338,8 +338,8 @@ void motor_enable_control(uint8_t enable)
     } else {
         g_Flag.motor_start = OFF;
         motor_stop();
-        g_lm.pid_out = 0.0f;
-        g_rm.pid_out = 0.0f;
+        g_lm.fp32_pid_out = 0.0f;
+        g_rm.fp32_pid_out = 0.0f;
     }
 }
 
@@ -374,67 +374,67 @@ void motor_init(void)
 
 static void motor_update_axis_feedback(motor_axis_t *pm, int16_t delta)
 {
-    pm->qep_delta = delta;
-    pm->qep_total += delta;
-    pm->tick_dist = (float)delta * MOTOR_PULSE_TO_DIST_MM;
-    pm->dist_sum += pm->tick_dist;
-    pm->gone_distance += pm->tick_dist;
-    pm->turnmark_check_dist += pm->tick_dist;
-    pm->cross_check_dist += pm->tick_dist;
+    pm->i16_qep_delta = delta;
+    pm->i32_qep_total += delta;
+    pm->fp32_tick_dist = (float)delta * MOTOR_PULSE_TO_DIST_MM;
+    pm->fp32_dist_sum += pm->fp32_tick_dist;
+    pm->fp32_gone_distance += pm->fp32_tick_dist;
+    pm->fp32_turnmark_check_dist += pm->fp32_tick_dist;
+    pm->fp32_cross_check_dist += pm->fp32_tick_dist;
 
-    pm->cur_vel[1] = pm->cur_vel[0];
-    pm->cur_vel[0] = (float)delta * MOTOR_PULSE_TO_VEL_MM_S;
-    pm->cur_vel_avr = (pm->cur_vel[0] + pm->cur_vel[1]) * 0.5f;
+    pm->fp32_cur_vel[1] = pm->fp32_cur_vel[0];
+    pm->fp32_cur_vel[0] = (float)delta * MOTOR_PULSE_TO_VEL_MM_S;
+    pm->fp32_cur_vel_avr = (pm->fp32_cur_vel[0] + pm->fp32_cur_vel[1]) * 0.5f;
 }
 
 static void motor_update_distance_state(void)
 {
-    const float total = (g_lm.dist_sum + g_rm.dist_sum) * 0.5f;
+    const float total = (g_lm.fp32_dist_sum + g_rm.fp32_dist_sum) * 0.5f;
 
-    g_lm.total_dist = total;
-    g_rm.total_dist = total;
-    g_lm.err_dist = g_lm.user_dist - g_lm.total_dist;
-    g_rm.err_dist = g_rm.user_dist - g_rm.total_dist;
+    g_lm.fp32_total_dist = total;
+    g_rm.fp32_total_dist = total;
+    g_lm.fp32_err_dist = g_lm.fp32_user_dist - g_lm.fp32_total_dist;
+    g_rm.fp32_err_dist = g_rm.fp32_user_dist - g_rm.fp32_total_dist;
 }
 
 static void motor_update_decel_state(void)
 {
-    if ((g_rm.decel_flag == ON) && (g_rm.decel_dist >= motor_fabsf(g_rm.err_dist))) {
-        g_rm.user_vel = g_rm.decel_vel;
-        g_lm.user_vel = g_lm.decel_vel;
-        g_rm.decel_flag = OFF;
-        g_lm.decel_flag = OFF;
+    if ((g_rm.u16_decel_flag == ON) && (g_rm.fp32_decel_dist >= motor_fabsf(g_rm.fp32_err_dist))) {
+        g_rm.fp32_user_vel = g_rm.fp32_decel_vel;
+        g_lm.fp32_user_vel = g_lm.fp32_decel_vel;
+        g_rm.u16_decel_flag = OFF;
+        g_lm.u16_decel_flag = OFF;
         g_Flag.speed_up = OFF;
         g_Flag.speed_up_start = OFF;
-        g_rm.accel = g_rm.decel;
-        g_lm.accel = g_lm.decel;
+        g_rm.fp32_accel = g_rm.fp32_decel;
+        g_lm.fp32_accel = g_lm.fp32_decel;
     }
 
-    if ((g_lm.decel_flag == ON) && (g_lm.decel_dist >= motor_fabsf(g_lm.err_dist))) {
-        g_rm.user_vel = g_rm.decel_vel;
-        g_lm.user_vel = g_lm.decel_vel;
-        g_rm.decel_flag = OFF;
-        g_lm.decel_flag = OFF;
+    if ((g_lm.u16_decel_flag == ON) && (g_lm.fp32_decel_dist >= motor_fabsf(g_lm.fp32_err_dist))) {
+        g_rm.fp32_user_vel = g_rm.fp32_decel_vel;
+        g_lm.fp32_user_vel = g_lm.fp32_decel_vel;
+        g_rm.u16_decel_flag = OFF;
+        g_lm.u16_decel_flag = OFF;
         g_Flag.speed_up = OFF;
         g_Flag.speed_up_start = OFF;
-        g_rm.accel = g_rm.decel;
-        g_lm.accel = g_lm.decel;
+        g_rm.fp32_accel = g_rm.fp32_decel;
+        g_lm.fp32_accel = g_lm.fp32_decel;
     }
 }
 
 static void motor_update_velocity_ramp(motor_axis_t *pm)
 {
-    const float step = pm->accel * MOTOR_SAMPLE_SEC;
+    const float step = pm->fp32_accel * MOTOR_SAMPLE_SEC;
 
-    if (pm->user_vel > pm->next_vel) {
-        pm->next_vel += step;
-        if (pm->user_vel < pm->next_vel) {
-            pm->next_vel = pm->user_vel;
+    if (pm->fp32_user_vel > pm->fp32_next_vel) {
+        pm->fp32_next_vel += step;
+        if (pm->fp32_user_vel < pm->fp32_next_vel) {
+            pm->fp32_next_vel = pm->fp32_user_vel;
         }
-    } else if (pm->user_vel < pm->next_vel) {
-        pm->next_vel -= step;
-        if (pm->user_vel > pm->next_vel) {
-            pm->next_vel = pm->user_vel;
+    } else if (pm->fp32_user_vel < pm->fp32_next_vel) {
+        pm->fp32_next_vel -= step;
+        if (pm->fp32_user_vel > pm->fp32_next_vel) {
+            pm->fp32_next_vel = pm->fp32_user_vel;
         }
     }
 }
@@ -443,34 +443,34 @@ static void motor_update_pid(motor_axis_t *pm)
 {
     uint8_t i;
     float diff_mix;
-    const float target_vel = pm->next_vel * pm->handle;
+    const float target_vel = pm->fp32_next_vel * pm->fp32_handle;
 
     for (i = 3U; i > 0U; i--) {
-        pm->err_vel[i] = pm->err_vel[i - 1U];
+        pm->fp32_err_vel[i] = pm->fp32_err_vel[i - 1U];
     }
 
-    pm->err_vel[0] = target_vel - pm->cur_vel_avr;
-    diff_mix = ((pm->err_vel[0] - pm->err_vel[3]) +
-                ((pm->err_vel[1] - pm->err_vel[2]) * 3.0f));
-    pm->proportional = pm->kp * pm->err_vel[0];
-    pm->derivative = pm->kd * diff_mix;
-    pm->pid_out += pm->proportional + pm->derivative;
-    pm->pid_out = motor_clampf(pm->pid_out, MOTOR_MIN_PID_OUT, MOTOR_MAX_PID_OUT);
+    pm->fp32_err_vel[0] = target_vel - pm->fp32_cur_vel_avr;
+    diff_mix = ((pm->fp32_err_vel[0] - pm->fp32_err_vel[3]) +
+                ((pm->fp32_err_vel[1] - pm->fp32_err_vel[2]) * 3.0f));
+    pm->fp32_proportional = pm->fp32_kp * pm->fp32_err_vel[0];
+    pm->fp32_derivative = pm->fp32_kd * diff_mix;
+    pm->fp32_pid_out += pm->fp32_proportional + pm->fp32_derivative;
+    pm->fp32_pid_out = motor_clampf(pm->fp32_pid_out, MOTOR_MIN_PID_OUT, MOTOR_MAX_PID_OUT);
 
-    pm->pid_result = (pm->pid_out / MOTOR_MAX_PID_OUT) * (float)MOTOR_PWM_PERIOD;
+    pm->fp32_pid_result = (pm->fp32_pid_out / MOTOR_MAX_PID_OUT) * (float)MOTOR_PWM_PERIOD;
 }
 
-static int16_t motor_pid_to_pwm(float pid_result)
+static int16_t motor_pid_to_pwm(float fp32_pid_result)
 {
-    if (pid_result > (float)MOTOR_PWM_PERIOD) {
+    if (fp32_pid_result > (float)MOTOR_PWM_PERIOD) {
         return (int16_t)MOTOR_PWM_PERIOD;
     }
 
-    if (pid_result < -(float)MOTOR_PWM_PERIOD) {
+    if (fp32_pid_result < -(float)MOTOR_PWM_PERIOD) {
         return -(int16_t)MOTOR_PWM_PERIOD;
     }
 
-    return (int16_t)pid_result;
+    return (int16_t)fp32_pid_result;
 }
 
 static void motor_position_to_vel(void)
@@ -482,61 +482,61 @@ static void motor_position_to_vel(void)
     if (g_Flag.err == ON) {
         g_Flag.fast_flag = OFF;
 
-        if (g_q17user_vel > 2200.0f) {
-            g_q17user_vel = 2200.0f;
+        if (g_fp32_user_vel > 2200.0f) {
+            g_fp32_user_vel = 2200.0f;
         }
 
-        g_rm.user_vel = g_q17user_vel;
-        g_lm.user_vel = g_q17user_vel;
+        g_rm.fp32_user_vel = g_fp32_user_vel;
+        g_lm.fp32_user_vel = g_fp32_user_vel;
 
-        g_fast_info[g_int32mark_cnt].q17kp_val = POS_KP_UP;
-        g_fast_info[g_int32mark_cnt].speed_up_45 = OFF;
-        g_fast_info[g_int32mark_cnt].s44s_flag = OFF;
-        g_fast_info[g_int32mark_cnt].escape_flag = OFF;
-        g_fast_info[g_int32mark_cnt].down_flag = OFF;
+        g_fast_info[g_i32_mark_cnt].fp32_kp = POS_KP_UP;
+        g_fast_info[g_i32_mark_cnt].u16_speed_up_45 = OFF;
+        g_fast_info[g_i32_mark_cnt].u16_s44s_flag = OFF;
+        g_fast_info[g_i32_mark_cnt].u16_escape_flag = OFF;
+        g_fast_info[g_i32_mark_cnt].u16_down_flag = OFF;
     }
 
     if (g_Flag.speed_up == ON) {
         g_Flag.straight_run = ON;
 
-        if (g_fast_info[g_int32mark_cnt].q17vel > 0.0f) {
-            g_lm.user_vel = g_fast_info[g_int32mark_cnt].q17vel;
-            g_rm.user_vel = g_lm.user_vel;
+        if (g_fast_info[g_i32_mark_cnt].fp32_vel > 0.0f) {
+            g_lm.fp32_user_vel = g_fast_info[g_i32_mark_cnt].fp32_vel;
+            g_rm.fp32_user_vel = g_lm.fp32_user_vel;
         }
     }
 }
 
 void motor_500us_irq_handler(void)
 {
-    int16_t left_delta;
-    int16_t right_delta;
+    int16_t i16_left_delta;
+    int16_t i16_right_delta;
     int16_t gyro_raw_z;
     float gyro_dps_z;
 
     if (LSM6DSR_ReadGyroZ(&gyro_raw_z, &gyro_dps_z) != 0U) {
-        g_q17_dps_z = gyro_dps_z;
-        g_q17_tick_z = gyro_dps_z * MOTOR_SAMPLE_SEC;
-        g_q17current_angle += g_q17_tick_z;
-        g_q17turn_angle += g_q17_tick_z;
+        g_fp32_gyro_dps_z = gyro_dps_z;
+        g_fp32_gyro_tick_z = gyro_dps_z * MOTOR_SAMPLE_SEC;
+        g_fp32_current_angle += g_fp32_gyro_tick_z;
+        g_fp32_turn_angle += g_fp32_gyro_tick_z;
     }
 
-    left_delta = (int16_t)(MOTOR_LEFT_ENCODER_SIGN * motor_counter_to_delta(LL_TIM_GetCounter(TIM3)));
-    right_delta = (int16_t)(MOTOR_RIGHT_ENCODER_SIGN * motor_counter_to_delta(LL_TIM_GetCounter(TIM4)));
+    i16_left_delta = (int16_t)(MOTOR_LEFT_ENCODER_SIGN * motor_counter_to_delta(LL_TIM_GetCounter(TIM3)));
+    i16_right_delta = (int16_t)(MOTOR_RIGHT_ENCODER_SIGN * motor_counter_to_delta(LL_TIM_GetCounter(TIM4)));
 
     LL_TIM_SetCounter(TIM3, 0U);
     LL_TIM_SetCounter(TIM4, 0U);
 
-    g_motor_feedback.left_delta = left_delta;
-    g_motor_feedback.right_delta = right_delta;
-    g_motor_feedback.left_count += left_delta;
-    g_motor_feedback.right_count += right_delta;
-    g_motor_feedback.tick_500us++;
+    g_motor_feedback.i16_left_delta = i16_left_delta;
+    g_motor_feedback.i16_right_delta = i16_right_delta;
+    g_motor_feedback.i32_left_count += i16_left_delta;
+    g_motor_feedback.i32_right_count += i16_right_delta;
+    g_motor_feedback.u32_tick_500us++;
 
     g_Flag.motor_ISR_flag = ON;
     g_u32_motor_isr_cnt++;
 
-    motor_update_axis_feedback(&g_lm, left_delta);
-    motor_update_axis_feedback(&g_rm, right_delta);
+    motor_update_axis_feedback(&g_lm, i16_left_delta);
+    motor_update_axis_feedback(&g_rm, i16_right_delta);
     motor_update_distance_state();
     motor_update_decel_state();
     position_PID();
@@ -547,17 +547,17 @@ void motor_500us_irq_handler(void)
         motor_update_velocity_ramp(&g_lm);
         motor_update_pid(&g_rm);
         motor_update_pid(&g_lm);
-        motor_set_pwm(motor_pid_to_pwm(g_lm.pid_result), motor_pid_to_pwm(g_rm.pid_result));
+        motor_set_pwm(motor_pid_to_pwm(g_lm.fp32_pid_result), motor_pid_to_pwm(g_rm.fp32_pid_result));
     } else {
-        g_lm.pid_out = 0.0f;
-        g_rm.pid_out = 0.0f;
-        g_lm.pid_result = 0.0f;
-        g_rm.pid_result = 0.0f;
+        g_lm.fp32_pid_out = 0.0f;
+        g_rm.fp32_pid_out = 0.0f;
+        g_lm.fp32_pid_result = 0.0f;
+        g_rm.fp32_pid_result = 0.0f;
         motor_stop();
     }
 
     if (g_Flag.start_flag == ON) {
-        g_int32timer_cnt++;
+        g_i32_timer_cnt++;
     }
 
     sensor_scan_cycle_start();
@@ -572,18 +572,18 @@ void motor_encoder_test(void)
     motor_enable_control(OFF);
     motor_reset_motion_state();
 
-    prev_left_count = g_motor_feedback.left_count;
-    prev_right_count = g_motor_feedback.right_count;
-    prev_tick = g_motor_feedback.tick_500us;
+    prev_left_count = g_motor_feedback.i32_left_count;
+    prev_right_count = g_motor_feedback.i32_right_count;
+    prev_tick = g_motor_feedback.u32_tick_500us;
 
     printf("ENC TEST START\r\n");
     printf("rotate wheels by hand, press DOWN to exit\r\n");
 
     while (SW_D != 0U) {
-        int32_t left_count;
-        int32_t right_count;
-        int32_t left_delta;
-        int32_t right_delta;
+        int32_t i32_left_count;
+        int32_t i32_right_count;
+        int32_t i32_left_delta;
+        int32_t i32_right_delta;
         uint32_t tick;
         uint32_t tick_delta;
         int32_t left_vel;
@@ -591,33 +591,33 @@ void motor_encoder_test(void)
 
         LL_mDelay(100U);
 
-        left_count = g_motor_feedback.left_count;
-        right_count = g_motor_feedback.right_count;
-        tick = g_motor_feedback.tick_500us;
+        i32_left_count = g_motor_feedback.i32_left_count;
+        i32_right_count = g_motor_feedback.i32_right_count;
+        tick = g_motor_feedback.u32_tick_500us;
 
-        left_delta = left_count - prev_left_count;
-        right_delta = right_count - prev_right_count;
+        i32_left_delta = i32_left_count - prev_left_count;
+        i32_right_delta = i32_right_count - prev_right_count;
         tick_delta = tick - prev_tick;
 
         if (tick_delta == 0U) {
             tick_delta = 1U;
         }
 
-        left_vel = (int32_t)(((float)left_delta * MOTOR_PULSE_TO_DIST_MM) /
+        left_vel = (int32_t)(((float)i32_left_delta * MOTOR_PULSE_TO_DIST_MM) /
                              ((float)tick_delta * MOTOR_SAMPLE_SEC));
-        right_vel = (int32_t)(((float)right_delta * MOTOR_PULSE_TO_DIST_MM) /
+        right_vel = (int32_t)(((float)i32_right_delta * MOTOR_PULSE_TO_DIST_MM) /
                               ((float)tick_delta * MOTOR_SAMPLE_SEC));
 
         printf("ENC L cnt=%ld d=%ld v=%ldmm/s | R cnt=%ld d=%ld v=%ldmm/s\r\n",
-               (long)left_count,
-               (long)left_delta,
+               (long)i32_left_count,
+               (long)i32_left_delta,
                (long)left_vel,
-               (long)right_count,
-               (long)right_delta,
+               (long)i32_right_count,
+               (long)i32_right_delta,
                (long)right_vel);
 
-        prev_left_count = left_count;
-        prev_right_count = right_count;
+        prev_left_count = i32_left_count;
+        prev_right_count = i32_right_count;
         prev_tick = tick;
     }
 

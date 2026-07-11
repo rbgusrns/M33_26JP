@@ -39,7 +39,7 @@ typedef struct {
 } rom_maxmin_t;
 
 typedef struct {
-    float user_vel;
+    float fp32_user_vel;
 } rom_turnvel_t;
 
 typedef struct {
@@ -67,7 +67,7 @@ typedef struct {
     float end_acc;
     float end_vel;
     float endturn_acc;
-    int32_t decel;
+    int32_t i32_decel;
 } rom_acc_t;
 
 typedef struct {
@@ -87,7 +87,7 @@ typedef struct {
     uint16_t turn_way[256];
     float l_dist[256];
     float r_dist[256];
-    float pos_integral[256];
+    float fp32_pos_integral[256];
 } rom_fastinfo_t;
 
 static uint32_t rom_record_addr(rom_record_id_t id)
@@ -214,7 +214,7 @@ void maxmin_read_rom(void)
 
 void turnvel_write_rom(void)
 {
-    rom_turnvel_t data = { g_q17user_vel };
+    rom_turnvel_t data = { g_fp32_user_vel };
 
     printf("ROM TURNVEL WRITE %s\r\n",
            (rom_write_record(ROM_REC_TURNVEL, &data, sizeof(data)) != 0U) ? "OK" : "FAIL");
@@ -225,7 +225,7 @@ void turnvel_read_rom(void)
     rom_turnvel_t data;
 
     if (rom_read_record(ROM_REC_TURNVEL, &data, sizeof(data)) != 0U) {
-        g_q17user_vel = data.user_vel;
+        g_fp32_user_vel = data.fp32_user_vel;
         printf("ROM TURNVEL READ OK\r\n");
     }
 }
@@ -233,15 +233,15 @@ void turnvel_read_rom(void)
 void extvel_write_rom(void)
 {
     rom_extvel_t data = {
-        g_q17s44s_vel,
-        g_q17s4s_vel,
-        g_q1745user_vel,
-        g_q17escape45_vel,
-        g_q17_45acc,
-        g_int32shift_level,
-        g_q17st_ret_ratio,
-        g_q17shift_ratio,
-        g_q17return_ratio
+        g_fp32_s44s_vel,
+        g_fp32_s4s_vel,
+        g_fp32_user_45_vel,
+        g_fp32_escape_45_vel,
+        g_fp32_acc_45,
+        g_i32_shift_level,
+        g_fp32_straight_return_ratio,
+        g_fp32_shift_ratio,
+        g_fp32_return_ratio
     };
 
     printf("ROM EXTVEL WRITE %s\r\n",
@@ -256,26 +256,26 @@ void extvel_read_rom(void)
         return;
     }
 
-    g_q17s44s_vel = data.s44s_vel;
-    g_q17s4s_vel = data.s4s_vel;
-    g_q1745user_vel = data.user_45_vel;
-    g_q17escape45_vel = data.escape45_vel;
-    g_q17_45acc = data.acc_45;
-    g_int32shift_level = data.shift_level;
-    g_q17st_ret_ratio = data.st_ret_ratio;
-    g_q17shift_ratio = data.shift_ratio;
-    g_q17return_ratio = data.return_ratio;
+    g_fp32_s44s_vel = data.s44s_vel;
+    g_fp32_s4s_vel = data.s4s_vel;
+    g_fp32_user_45_vel = data.user_45_vel;
+    g_fp32_escape_45_vel = data.escape45_vel;
+    g_fp32_acc_45 = data.acc_45;
+    g_i32_shift_level = data.shift_level;
+    g_fp32_straight_return_ratio = data.st_ret_ratio;
+    g_fp32_shift_ratio = data.shift_ratio;
+    g_fp32_return_ratio = data.return_ratio;
     printf("ROM EXTVEL READ OK\r\n");
 }
 
 void turnmark_info_write_rom(void)
 {
     rom_turnmark_t data = {
-        g_q17turnmark_dist,
-        g_u16turnmark_limit,
-        g_u16turn_dist,
-        g_q17sen_valmax,
-        g_q17turn_threshold
+        g_fp32_turnmark_dist,
+        g_u16_turnmark_limit,
+        g_u16_turn_dist,
+        g_fp32_sensor_value_max,
+        g_fp32_turn_threshold
     };
 
     printf("ROM TURNMARK WRITE %s\r\n",
@@ -290,24 +290,24 @@ void turnmark_info_read_rom(void)
         return;
     }
 
-    g_q17turnmark_dist = data.turnmark_dist;
-    g_u16turnmark_limit = data.turnmark_limit;
-    g_u16turn_dist = data.turn_dist;
-    g_q17sen_valmax = data.sen_valmax;
-    g_q17turn_threshold = data.turn_threshold;
-    g_q17str_mark_dist = g_q17turnmark_dist + 80.0f;
-    g_q17mark_dist = g_q17turnmark_dist;
+    g_fp32_turnmark_dist = data.turnmark_dist;
+    g_u16_turnmark_limit = data.turnmark_limit;
+    g_u16_turn_dist = data.turn_dist;
+    g_fp32_sensor_value_max = data.sen_valmax;
+    g_fp32_turn_threshold = data.turn_threshold;
+    g_fp32_straight_mark_dist = g_fp32_turnmark_dist + 80.0f;
+    g_fp32_mark_dist = g_fp32_turnmark_dist;
     printf("ROM TURNMARK READ OK\r\n");
 }
 
 void acc_info_write_rom(void)
 {
     rom_acc_t data = {
-        g_q17user_acc,
-        g_q17end_acc,
-        g_q17end_vel,
-        g_q17endturn_acc,
-        g_int32decel
+        g_fp32_user_acc,
+        g_fp32_end_acc,
+        g_fp32_end_vel,
+        g_fp32_endturn_acc,
+        g_i32_decel
     };
 
     printf("ROM ACC WRITE %s\r\n",
@@ -322,21 +322,21 @@ void acc_info_read_rom(void)
         return;
     }
 
-    g_q17user_acc = data.user_acc;
-    g_q17end_acc = data.end_acc;
-    g_q17end_vel = data.end_vel;
-    g_q17endturn_acc = data.endturn_acc;
-    g_int32decel = data.decel;
+    g_fp32_user_acc = data.user_acc;
+    g_fp32_end_acc = data.end_acc;
+    g_fp32_end_vel = data.end_vel;
+    g_fp32_endturn_acc = data.endturn_acc;
+    g_i32_decel = data.i32_decel;
     printf("ROM ACC READ OK\r\n");
 }
 
 void handle_write_rom(void)
 {
     rom_handle_t data = {
-        g_q16out_corner_limit,
-        g_q16in_corner_limit,
-        g_q16out_corner_fast_limit,
-        g_q16in_corner_fast_limit
+        g_fp32_out_corner_limit,
+        g_fp32_in_corner_limit,
+        g_fp32_out_corner_fast_limit,
+        g_fp32_in_corner_fast_limit
     };
 
     printf("ROM HANDLE WRITE %s\r\n",
@@ -351,16 +351,16 @@ void handle_read_rom(void)
         return;
     }
 
-    g_q16out_corner_limit = data.out_corner_limit;
-    g_q16in_corner_limit = data.in_corner_limit;
-    g_q16out_corner_fast_limit = data.out_corner_fast_limit;
-    g_q16in_corner_fast_limit = data.in_corner_fast_limit;
+    g_fp32_out_corner_limit = data.out_corner_limit;
+    g_fp32_in_corner_limit = data.in_corner_limit;
+    g_fp32_out_corner_fast_limit = data.out_corner_fast_limit;
+    g_fp32_in_corner_fast_limit = data.in_corner_fast_limit;
     printf("ROM HANDLE READ OK\r\n");
 }
 
 void mark_write_rom(void)
 {
-    rom_mark_t data = { g_int32total_cnt, g_int32mark_cnt };
+    rom_mark_t data = { g_i32_total_cnt, g_i32_mark_cnt };
 
     printf("ROM MARK WRITE %s\r\n",
            (rom_write_record(ROM_REC_MARK, &data, sizeof(data)) != 0U) ? "OK" : "FAIL");
@@ -371,9 +371,9 @@ void mark_read_rom(void)
     rom_mark_t data;
 
     if (rom_read_record(ROM_REC_MARK, &data, sizeof(data)) != 0U) {
-        g_int32total_cnt = data.total_cnt;
-        g_int32mark_cnt = data.mark_cnt;
-        printf("ROM MARK READ OK total=%ld\r\n", (long)g_int32total_cnt);
+        g_i32_total_cnt = data.total_cnt;
+        g_i32_mark_cnt = data.mark_cnt;
+        printf("ROM MARK READ OK total=%ld\r\n", (long)g_i32_total_cnt);
     }
 }
 
@@ -382,11 +382,11 @@ void fast_infor_write_rom(void)
     rom_fastinfo_t data;
 
     for (uint16_t i = 0U; i < 256U; i++) {
-        data.dist[i] = g_fast_info[i].u16dist;
-        data.turn_way[i] = g_fast_info[i].u16turn_way;
-        data.l_dist[i] = g_fast_info[i].q17l_dist;
-        data.r_dist[i] = g_fast_info[i].q17r_dist;
-        data.pos_integral[i] = g_fast_info[i].iq7pos_integral_val;
+        data.dist[i] = g_fast_info[i].u16_dist;
+        data.turn_way[i] = g_fast_info[i].u16_turn_way;
+        data.l_dist[i] = g_fast_info[i].fp32_left_dist;
+        data.r_dist[i] = g_fast_info[i].fp32_right_dist;
+        data.fp32_pos_integral[i] = g_fast_info[i].fp32_pos_integral;
     }
 
     printf("ROM FASTINFO WRITE %s\r\n",
@@ -402,11 +402,11 @@ void fast_infor_read_rom(void)
     }
 
     for (uint16_t i = 0U; i < 256U; i++) {
-        g_fast_info[i].u16dist = data.dist[i];
-        g_fast_info[i].u16turn_way = data.turn_way[i];
-        g_fast_info[i].q17l_dist = data.l_dist[i];
-        g_fast_info[i].q17r_dist = data.r_dist[i];
-        g_fast_info[i].iq7pos_integral_val = data.pos_integral[i];
+        g_fast_info[i].u16_dist = data.dist[i];
+        g_fast_info[i].u16_turn_way = data.turn_way[i];
+        g_fast_info[i].fp32_left_dist = data.l_dist[i];
+        g_fast_info[i].fp32_right_dist = data.r_dist[i];
+        g_fast_info[i].fp32_pos_integral = data.fp32_pos_integral[i];
     }
 
     printf("ROM FASTINFO READ OK\r\n");

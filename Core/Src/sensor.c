@@ -11,8 +11,8 @@
 #define SENSOR_EMITTER_PINS ((uint32_t)L0_Pin | (uint32_t)L1_Pin | (uint32_t)L2_Pin | (uint32_t)L3_Pin | \
                              (uint32_t)L4_Pin | (uint32_t)L5_Pin | (uint32_t)L6_Pin | (uint32_t)L7_Pin)
 
-static volatile uint8_t g_adc_step;
-static volatile uint8_t g_sensor_scan_started;
+static volatile uint8_t g_u8_adc_step;
+static volatile uint8_t g_u8_sensor_scan_started;
 
 typedef struct {
     led_pin_t led;
@@ -52,7 +52,7 @@ static const float sensor_weights[ADC_NUM] = {
 
 void sensor_scan_cycle_start(void)
 {
-    if (g_sensor_scan_started == 0U) {
+    if (g_u8_sensor_scan_started == 0U) {
         return;
     }
 
@@ -60,14 +60,14 @@ void sensor_scan_cycle_start(void)
         return;
     }
 
-    g_adc_step = 0U;
-    g_pos.u16state = 0U;
+    g_u8_adc_step = 0U;
+    g_pos.u16_state = 0U;
     LL_ADC_ClearFlag_EOC(ADC1);
     LL_ADC_ClearFlag_EOS(ADC1);
     LL_ADC_ClearFlag_EOC(ADC2);
     LL_ADC_ClearFlag_EOS(ADC2);
     LL_GPIO_ResetOutputPin(GPIOD, SENSOR_EMITTER_PINS);
-    LL_GPIO_SetOutputPin(scan_table[g_adc_step].led.port, scan_table[g_adc_step].led.pin);
+    LL_GPIO_SetOutputPin(scan_table[g_u8_adc_step].led.port, scan_table[g_u8_adc_step].led.pin);
 
     LL_ADC_REG_StartConversion(ADC1);
     LL_ADC_REG_StartConversion(ADC2);
@@ -86,21 +86,21 @@ void sen_vari_init(void)
 
     memset((void *)g_sen, 0, sizeof(sen_t) * ADC_NUM);
     memset((void *)&g_pos, 0, sizeof(g_pos));
-    g_u16pos_cnt = 6U;
-    g_u16sen_enable = 0xFFFFU;
-    g_u16sen_state = 0U;
+    g_u16_pos_cnt = 6U;
+    g_u16_sen_enable = 0xFFFFU;
+    g_u16_sen_state = 0U;
 
     for (i = 0U; i < ADC_NUM; i++) {
         g_sen[i].fp32_4095_min_value = 0.0f;
         g_sen[i].fp32_4095_max_value = 4095.0f;
-        g_sen[i].fp32weight = sensor_weights[i];
-        g_sen[i].u16active_arr = (uint16_t)(1UL << i);
-        g_sen[i].u16passive_arr = (uint16_t)~g_sen[i].u16active_arr;
+        g_sen[i].fp32_weight = sensor_weights[i];
+        g_sen[i].u16_active_arr = (uint16_t)(1UL << i);
+        g_sen[i].u16_passive_arr = (uint16_t)~g_sen[i].u16_active_arr;
     }
 
-    g_pos.fp32kp = POS_KP_UP;
-    g_pos.fp32ki = POS_KI_UP;
-    g_pos.fp32kd = POS_KD_UP;
+    g_pos.fp32_kp = POS_KP_UP;
+    g_pos.fp32_ki = POS_KI_UP;
+    g_pos.fp32_kd = POS_KD_UP;
     handle_ad_make(0.4f, 2.6f);
 
     LL_ADC_ClearFlag_ADRDY(ADC1);
@@ -130,13 +130,13 @@ void sensor_scan_start(void)
     NVIC_ClearPendingIRQ(ADC2_IRQn);
     LL_ADC_EnableIT_EOC(ADC2);
     LL_GPIO_ResetOutputPin(GPIOD, SENSOR_EMITTER_PINS);
-    g_sensor_scan_started = 1U;
+    g_u8_sensor_scan_started = 1U;
     sensor_scan_cycle_start();
 }
 
 static void sensor_scan_stop(void)
 {
-    g_sensor_scan_started = 0U;
+    g_u8_sensor_scan_started = 0U;
     LL_TIM_DisableIT_UPDATE(TIM2);
     LL_TIM_DisableCounter(TIM2);
     LL_TIM_ClearFlag_UPDATE(TIM2);
@@ -172,83 +172,83 @@ static void sensor_normalize(uint8_t idx)
     g_sen[idx].fp32_on_off_value = (g_sen[idx].fp32_127_value >= SENSOR_ON_THRESHOLD) ? 1.0f : 0.0f;
 
     if (g_sen[idx].fp32_127_value >= SENSOR_STATE_THRESHOLD) {
-        g_pos.u16state |= g_sen[idx].u16active_arr;
+        g_pos.u16_state |= g_sen[idx].u16_active_arr;
         g_Flag.lineout_flag = OFF;
     } else {
-        g_pos.u16state &= g_sen[idx].u16passive_arr;
+        g_pos.u16_state &= g_sen[idx].u16_passive_arr;
     }
 }
 
 static void position_enable(void)
 {
-    if (g_pos.fp32temp_pos > g_sen[15].fp32weight) {
-        g_u16pos_cnt = 12U;
-        g_u16sen_state = 8U;
-        g_u16sen_enable = 0xC000U;
-    } else if (g_pos.fp32temp_pos < g_sen[0].fp32weight) {
-        g_u16pos_cnt = 0U;
-        g_u16sen_state = 8U;
-        g_u16sen_enable = 0x0003U;
-    } else if (g_pos.fp32temp_pos > g_sen[14].fp32weight) {
-        g_u16pos_cnt = 12U;
-        g_u16sen_state = 7U;
-        g_u16sen_enable = 0xE000U;
-    } else if (g_pos.fp32temp_pos < g_sen[1].fp32weight) {
-        g_u16pos_cnt = 0U;
-        g_u16sen_state = 7U;
-        g_u16sen_enable = 0x0007U;
-    } else if (g_pos.fp32temp_pos > g_sen[13].fp32weight) {
-        g_u16pos_cnt = 12U;
-        g_u16sen_state = 6U;
-        g_u16sen_enable = 0xF000U;
-    } else if (g_pos.fp32temp_pos < g_sen[2].fp32weight) {
-        g_u16pos_cnt = 0U;
-        g_u16sen_state = 6U;
-        g_u16sen_enable = 0x000FU;
-    } else if (g_pos.fp32temp_pos > g_sen[12].fp32weight) {
-        g_u16pos_cnt = 11U;
-        g_u16sen_state = 5U;
-        g_u16sen_enable = 0x7800U;
-    } else if (g_pos.fp32temp_pos < g_sen[3].fp32weight) {
-        g_u16pos_cnt = 1U;
-        g_u16sen_state = 5U;
-        g_u16sen_enable = 0x001EU;
-    } else if (g_pos.fp32temp_pos > g_sen[11].fp32weight) {
-        g_u16pos_cnt = 10U;
-        g_u16sen_state = 4U;
-        g_u16sen_enable = 0x3C00U;
-    } else if (g_pos.fp32temp_pos < g_sen[4].fp32weight) {
-        g_u16pos_cnt = 2U;
-        g_u16sen_state = 4U;
-        g_u16sen_enable = 0x003CU;
-    } else if (g_pos.fp32temp_pos > g_sen[10].fp32weight) {
-        g_u16pos_cnt = 9U;
-        g_u16sen_state = 3U;
-        g_u16sen_enable = 0x1E00U;
-    } else if (g_pos.fp32temp_pos < g_sen[5].fp32weight) {
-        g_u16pos_cnt = 3U;
-        g_u16sen_state = 3U;
-        g_u16sen_enable = 0x0078U;
-    } else if (g_pos.fp32temp_pos > g_sen[9].fp32weight) {
-        g_u16pos_cnt = 8U;
-        g_u16sen_state = 2U;
-        g_u16sen_enable = 0x0F00U;
-    } else if (g_pos.fp32temp_pos < g_sen[6].fp32weight) {
-        g_u16pos_cnt = 4U;
-        g_u16sen_state = 2U;
-        g_u16sen_enable = 0x00F0U;
-    } else if (g_pos.fp32temp_pos > g_sen[8].fp32weight) {
-        g_u16pos_cnt = 7U;
-        g_u16sen_state = 1U;
-        g_u16sen_enable = 0x0780U;
-    } else if (g_pos.fp32temp_pos < g_sen[7].fp32weight) {
-        g_u16pos_cnt = 5U;
-        g_u16sen_state = 1U;
-        g_u16sen_enable = 0x01E0U;
+    if (g_pos.fp32_temp_pos > g_sen[15].fp32_weight) {
+        g_u16_pos_cnt = 12U;
+        g_u16_sen_state = 8U;
+        g_u16_sen_enable = 0xC000U;
+    } else if (g_pos.fp32_temp_pos < g_sen[0].fp32_weight) {
+        g_u16_pos_cnt = 0U;
+        g_u16_sen_state = 8U;
+        g_u16_sen_enable = 0x0003U;
+    } else if (g_pos.fp32_temp_pos > g_sen[14].fp32_weight) {
+        g_u16_pos_cnt = 12U;
+        g_u16_sen_state = 7U;
+        g_u16_sen_enable = 0xE000U;
+    } else if (g_pos.fp32_temp_pos < g_sen[1].fp32_weight) {
+        g_u16_pos_cnt = 0U;
+        g_u16_sen_state = 7U;
+        g_u16_sen_enable = 0x0007U;
+    } else if (g_pos.fp32_temp_pos > g_sen[13].fp32_weight) {
+        g_u16_pos_cnt = 12U;
+        g_u16_sen_state = 6U;
+        g_u16_sen_enable = 0xF000U;
+    } else if (g_pos.fp32_temp_pos < g_sen[2].fp32_weight) {
+        g_u16_pos_cnt = 0U;
+        g_u16_sen_state = 6U;
+        g_u16_sen_enable = 0x000FU;
+    } else if (g_pos.fp32_temp_pos > g_sen[12].fp32_weight) {
+        g_u16_pos_cnt = 11U;
+        g_u16_sen_state = 5U;
+        g_u16_sen_enable = 0x7800U;
+    } else if (g_pos.fp32_temp_pos < g_sen[3].fp32_weight) {
+        g_u16_pos_cnt = 1U;
+        g_u16_sen_state = 5U;
+        g_u16_sen_enable = 0x001EU;
+    } else if (g_pos.fp32_temp_pos > g_sen[11].fp32_weight) {
+        g_u16_pos_cnt = 10U;
+        g_u16_sen_state = 4U;
+        g_u16_sen_enable = 0x3C00U;
+    } else if (g_pos.fp32_temp_pos < g_sen[4].fp32_weight) {
+        g_u16_pos_cnt = 2U;
+        g_u16_sen_state = 4U;
+        g_u16_sen_enable = 0x003CU;
+    } else if (g_pos.fp32_temp_pos > g_sen[10].fp32_weight) {
+        g_u16_pos_cnt = 9U;
+        g_u16_sen_state = 3U;
+        g_u16_sen_enable = 0x1E00U;
+    } else if (g_pos.fp32_temp_pos < g_sen[5].fp32_weight) {
+        g_u16_pos_cnt = 3U;
+        g_u16_sen_state = 3U;
+        g_u16_sen_enable = 0x0078U;
+    } else if (g_pos.fp32_temp_pos > g_sen[9].fp32_weight) {
+        g_u16_pos_cnt = 8U;
+        g_u16_sen_state = 2U;
+        g_u16_sen_enable = 0x0F00U;
+    } else if (g_pos.fp32_temp_pos < g_sen[6].fp32_weight) {
+        g_u16_pos_cnt = 4U;
+        g_u16_sen_state = 2U;
+        g_u16_sen_enable = 0x00F0U;
+    } else if (g_pos.fp32_temp_pos > g_sen[8].fp32_weight) {
+        g_u16_pos_cnt = 7U;
+        g_u16_sen_state = 1U;
+        g_u16_sen_enable = 0x0780U;
+    } else if (g_pos.fp32_temp_pos < g_sen[7].fp32_weight) {
+        g_u16_pos_cnt = 5U;
+        g_u16_sen_state = 1U;
+        g_u16_sen_enable = 0x01E0U;
     } else {
-        g_u16pos_cnt = 6U;
-        g_u16sen_state = 0U;
-        g_u16sen_enable = 0x03C0U;
+        g_u16_pos_cnt = 6U;
+        g_u16_sen_state = 0U;
+        g_u16_sen_enable = 0x03C0U;
     }
 }
 
@@ -268,28 +268,28 @@ static float sensor_clampf(float value, float min_value, float max_value)
 void make_position(void)
 {
     uint8_t i;
-    uint8_t base = (uint8_t)g_u16pos_cnt;
+    uint8_t base = (uint8_t)g_u16_pos_cnt;
 
-    g_pos.fp32sensor_sum = 0.0f;
-    g_pos.fp32weighted_sum = 0.0f;
+    g_pos.fp32_sensor_sum = 0.0f;
+    g_pos.fp32_weighted_sum = 0.0f;
 
     if (base > 12U) {
         base = 12U;
-        g_u16pos_cnt = 12U;
+        g_u16_pos_cnt = 12U;
     }
 
     for (i = 0U; i < 4U; i++) {
         uint8_t idx = (uint8_t)(base + i);
-        g_pos.fp32sensor_sum += g_sen[idx].fp32_127_value;
-        g_pos.fp32weighted_sum += g_sen[idx].fp32weight * g_sen[idx].fp32_127_value;
+        g_pos.fp32_sensor_sum += g_sen[idx].fp32_127_value;
+        g_pos.fp32_weighted_sum += g_sen[idx].fp32_weight * g_sen[idx].fp32_127_value;
     }
 
-    g_pos.fp32position_sum = g_pos.fp32sensor_sum;
-    if (g_pos.fp32sensor_sum > 0.0f) {
+    g_pos.fp32_position_sum = g_pos.fp32_sensor_sum;
+    if (g_pos.fp32_sensor_sum > 0.0f) {
         cross_check();
-        g_pos.fp32temp_pos = g_pos.fp32weighted_sum / g_pos.fp32sensor_sum;
-        g_pos.fp32temp_pos = sensor_clampf(g_pos.fp32temp_pos, -POS_END, POS_END);
-        g_pos.fp32temp_position = g_pos.fp32temp_pos;
+        g_pos.fp32_temp_pos = g_pos.fp32_weighted_sum / g_pos.fp32_sensor_sum;
+        g_pos.fp32_temp_pos = sensor_clampf(g_pos.fp32_temp_pos, -POS_END, POS_END);
+        g_pos.fp32_temp_position = g_pos.fp32_temp_pos;
         g_Flag.lineout_flag = OFF;
         position_enable();
     } else {
@@ -305,69 +305,69 @@ void handle_ad_make(float acc_rate, float dec_rate)
         return;
     }
 
-    g_q16han_accstep = (1.0f - acc_rate) / center_step;
-    g_q16han_decstep = (dec_rate - 1.0f) / center_step;
-    g_q16han_accmax = acc_rate;
-    g_q16han_decmax = 2.0f - dec_rate;
+    g_fp32_handle_acc_step = (1.0f - acc_rate) / center_step;
+    g_fp32_handle_dec_step = (dec_rate - 1.0f) / center_step;
+    g_fp32_handle_acc_max = acc_rate;
+    g_fp32_handle_dec_max = 2.0f - dec_rate;
 }
 
 void position_PID(void)
 {
     float pid_mix;
     const float center_step = HANDLE_CENTER / 250.0f;
-    const float pid_step = g_pos.fp32pid_out / 250.0f;
+    const float pid_step = g_pos.fp32_pid_out / 250.0f;
 
-    g_pos.fp32pos_iir_puted = g_pos.fp32pos_iir_puting;
-    g_pos.fp32pos_iir_puting = g_pos.fp32temp_pos;
-    g_pos.fp32pos_iir_output = (PID_KB * (g_pos.fp32pos_iir_puted + g_pos.fp32pos_iir_puting)) -
-                               (PID_KA * g_pos.fp32past_pos[0]);
+    g_pos.fp32_pos_iir_puted = g_pos.fp32_pos_iir_puting;
+    g_pos.fp32_pos_iir_puting = g_pos.fp32_temp_pos;
+    g_pos.fp32_pos_iir_output = (PID_KB * (g_pos.fp32_pos_iir_puted + g_pos.fp32_pos_iir_puting)) -
+                               (PID_KA * g_pos.fp32_past_pos[0]);
 
-    g_pos.fp32past_pos[3] = g_pos.fp32past_pos[2];
-    g_pos.fp32past_pos[2] = g_pos.fp32past_pos[1];
-    g_pos.fp32past_pos[1] = g_pos.fp32past_pos[0];
-    g_pos.fp32past_pos[0] = g_pos.fp32pos_iir_output;
+    g_pos.fp32_past_pos[3] = g_pos.fp32_past_pos[2];
+    g_pos.fp32_past_pos[2] = g_pos.fp32_past_pos[1];
+    g_pos.fp32_past_pos[1] = g_pos.fp32_past_pos[0];
+    g_pos.fp32_past_pos[0] = g_pos.fp32_pos_iir_output;
 
-    pid_mix = (g_pos.fp32past_pos[0] - g_pos.fp32past_pos[3]) +
-              (3.0f * (g_pos.fp32past_pos[1] - g_pos.fp32past_pos[2]));
+    pid_mix = (g_pos.fp32_past_pos[0] - g_pos.fp32_past_pos[3]) +
+              (3.0f * (g_pos.fp32_past_pos[1] - g_pos.fp32_past_pos[2]));
 
-    g_pos.fp32proportion_val = g_pos.fp32past_pos[0] * g_pos.fp32kp;
-    g_pos.fp32differential_val = pid_mix * g_pos.fp32kd;
-    g_pos.fp32pid_out = g_pos.fp32proportion_val + g_pos.fp32differential_val + g_pos.fp32integral_val;
-    g_pos.fp32pid_out = sensor_clampf(g_pos.fp32pid_out, -POS_END, POS_END);
+    g_pos.fp32_proportion_val = g_pos.fp32_past_pos[0] * g_pos.fp32_kp;
+    g_pos.fp32_differential_val = pid_mix * g_pos.fp32_kd;
+    g_pos.fp32_pid_out = g_pos.fp32_proportion_val + g_pos.fp32_differential_val + g_pos.fp32_integral_val;
+    g_pos.fp32_pid_out = sensor_clampf(g_pos.fp32_pid_out, -POS_END, POS_END);
 
-    if (g_pos.fp32pid_out > 0.0f) {
-        g_q16right_handle_temp = (g_q16han_decstep * (center_step - pid_step)) + g_q16han_decmax;
-        g_q16left_handle_temp = (g_q16han_accstep * (center_step + pid_step)) + g_q16han_accmax;
+    if (g_pos.fp32_pid_out > 0.0f) {
+        g_fp32_right_handle_temp = (g_fp32_handle_dec_step * (center_step - pid_step)) + g_fp32_handle_dec_max;
+        g_fp32_left_handle_temp = (g_fp32_handle_acc_step * (center_step + pid_step)) + g_fp32_handle_acc_max;
 
-        if (g_q16right_handle_temp < 0.0f) {
-            g_q16right_handle_temp = 0.0f;
+        if (g_fp32_right_handle_temp < 0.0f) {
+            g_fp32_right_handle_temp = 0.0f;
         }
     } else {
-        g_q16right_handle_temp = (g_q16han_accstep * (center_step - pid_step)) + g_q16han_accmax;
-        g_q16left_handle_temp = (g_q16han_decstep * (center_step + pid_step)) + g_q16han_decmax;
+        g_fp32_right_handle_temp = (g_fp32_handle_acc_step * (center_step - pid_step)) + g_fp32_handle_acc_max;
+        g_fp32_left_handle_temp = (g_fp32_handle_dec_step * (center_step + pid_step)) + g_fp32_handle_dec_max;
 
-        if (g_q16left_handle_temp < 0.0f) {
-            g_q16left_handle_temp = 0.0f;
+        if (g_fp32_left_handle_temp < 0.0f) {
+            g_fp32_left_handle_temp = 0.0f;
         }
     }
 
-    g_q17left_handle = g_q16left_handle_temp;
-    g_q17right_handle = g_q16right_handle_temp;
-    g_lm.handle = g_q17left_handle;
-    g_rm.handle = g_q17right_handle;
+    g_fp32_left_handle = g_fp32_left_handle_temp;
+    g_fp32_right_handle = g_fp32_right_handle_temp;
+    g_lm.fp32_handle = g_fp32_left_handle;
+    g_rm.fp32_handle = g_fp32_right_handle;
 }
 
 static void mark_enable_shift(turnmark_t *pleft, turnmark_t *pright)
 {
-    if ((g_u16sen_enable & RIGHT_ENABLE) != 0U) {
-        pleft->u16mark_enable = (uint16_t)(LEFT_MARK_CHECK << g_u16sen_state);
-        pright->u16mark_enable = (uint16_t)(RIGHT_MARK_CHECK << g_u16sen_state);
-    } else if ((g_u16sen_enable & LEFT_ENABLE) != 0U) {
-        pleft->u16mark_enable = (uint16_t)(LEFT_MARK_CHECK >> g_u16sen_state);
-        pright->u16mark_enable = (uint16_t)(RIGHT_MARK_CHECK >> g_u16sen_state);
+    if ((g_u16_sen_enable & RIGHT_ENABLE) != 0U) {
+        pleft->u16_mark_enable = (uint16_t)(LEFT_MARK_CHECK << g_u16_sen_state);
+        pright->u16_mark_enable = (uint16_t)(RIGHT_MARK_CHECK << g_u16_sen_state);
+    } else if ((g_u16_sen_enable & LEFT_ENABLE) != 0U) {
+        pleft->u16_mark_enable = (uint16_t)(LEFT_MARK_CHECK >> g_u16_sen_state);
+        pright->u16_mark_enable = (uint16_t)(RIGHT_MARK_CHECK >> g_u16_sen_state);
     } else {
-        pleft->u16mark_enable = LEFT_MARK_CHECK;
-        pright->u16mark_enable = RIGHT_MARK_CHECK;
+        pleft->u16_mark_enable = LEFT_MARK_CHECK;
+        pright->u16_mark_enable = RIGHT_MARK_CHECK;
     }
 }
 
@@ -375,10 +375,10 @@ static void cross_check(void)
 {
     uint16_t state;
 
-    if ((g_u16sen_enable & RIGHT_ENABLE) != 0U) {
-        state = (uint16_t)(9U - g_u16sen_state);
-    } else if ((g_u16sen_enable & LEFT_ENABLE) != 0U) {
-        state = (uint16_t)(9U + g_u16sen_state);
+    if ((g_u16_sen_enable & RIGHT_ENABLE) != 0U) {
+        state = (uint16_t)(9U - g_u16_sen_state);
+    } else if ((g_u16_sen_enable & LEFT_ENABLE) != 0U) {
+        state = (uint16_t)(9U + g_u16_sen_state);
     } else {
         state = 9U;
     }
@@ -387,23 +387,23 @@ static void cross_check(void)
         return;
     }
 
-    if (((g_pos.u16state & state_table[state]) == state_table[state]) ||
-        ((g_pos.u16state & state_table[state - 1U]) == state_table[state - 1U]) ||
-        ((g_pos.u16state & state_table[state + 1U]) == state_table[state + 1U])) {
+    if (((g_pos.u16_state & state_table[state]) == state_table[state]) ||
+        ((g_pos.u16_state & state_table[state - 1U]) == state_table[state - 1U]) ||
+        ((g_pos.u16_state & state_table[state + 1U]) == state_table[state + 1U])) {
         g_Flag.cross_flag = ON;
     } else if (g_Flag.cross_flag == ON) {
-        if (((g_lm.cross_check_dist + g_rm.cross_check_dist) * 0.5f) > 140.0f) {
+        if (((g_lm.fp32_cross_check_dist + g_rm.fp32_cross_check_dist) * 0.5f) > 140.0f) {
             g_Flag.cross_flag = OFF;
-            g_lmark.u16turn_flag = OFF;
-            g_rmark.u16turn_flag = OFF;
-            g_lmark.fp32turnmark_dist = 0.0f;
-            g_rmark.fp32turnmark_dist = 0.0f;
-            g_lm.cross_check_dist = 0.0f;
-            g_rm.cross_check_dist = 0.0f;
+            g_lmark.u16_turn_flag = OFF;
+            g_rmark.u16_turn_flag = OFF;
+            g_lmark.fp32_turnmark_dist = 0.0f;
+            g_rmark.fp32_turnmark_dist = 0.0f;
+            g_lm.fp32_cross_check_dist = 0.0f;
+            g_rm.fp32_cross_check_dist = 0.0f;
         }
     } else {
-        g_lm.cross_check_dist = 0.0f;
-        g_rm.cross_check_dist = 0.0f;
+        g_lm.fp32_cross_check_dist = 0.0f;
+        g_rm.fp32_cross_check_dist = 0.0f;
     }
 }
 
@@ -413,20 +413,20 @@ void turn_decide(turnmark_t *pmark, turnmark_t *premark)
         return;
     }
 
-    pmark->fp32turnmark_dist = (g_lm.turnmark_check_dist + g_rm.turnmark_check_dist) * 0.5f;
+    pmark->fp32_turnmark_dist = (g_lm.fp32_turnmark_check_dist + g_rm.fp32_turnmark_check_dist) * 0.5f;
 
-    if (pmark->u16single_flag == ON) {
-        if (pmark->fp32turnmark_dist > pmark->fp32limit_dist) {
-            if ((pmark == &g_lmark) && (premark->u16single_flag == ON)) {
+    if (pmark->u16_single_flag == ON) {
+        if (pmark->fp32_turnmark_dist > pmark->fp32_limit_dist) {
+            if ((pmark == &g_lmark) && (premark->u16_single_flag == ON)) {
                 return;
             }
 
-            pmark->u16single_flag = OFF;
-            pmark->u16turn_flag = OFF;
-            pmark->fp32turnmark_dist = 0.0f;
+            pmark->u16_single_flag = OFF;
+            pmark->u16_turn_flag = OFF;
+            pmark->fp32_turnmark_dist = 0.0f;
 
-            if (pmark->u16cross_flag == ON) {
-                pmark->u16cross_flag = OFF;
+            if (pmark->u16_cross_flag == ON) {
+                pmark->u16_cross_flag = OFF;
                 if ((pmark == &g_rmark) && (g_Flag.cross_flag == OFF)) {
                     start_end_check();
                 }
@@ -441,8 +441,8 @@ void turn_decide(turnmark_t *pmark, turnmark_t *premark)
                     second_infor((fast_run_str *)g_fast_info, (error_str *)&g_err);
                 }
             }
-        } else if (premark->u16single_flag == ON) {
-            pmark->u16cross_flag = ON;
+        } else if (premark->u16_single_flag == ON) {
+            pmark->u16_cross_flag = ON;
         }
 
         return;
@@ -450,20 +450,20 @@ void turn_decide(turnmark_t *pmark, turnmark_t *premark)
 
     mark_enable_shift(&g_lmark, &g_rmark);
 
-    if ((pmark->u16mark_enable & g_pos.u16state) != 0U) {
-        if (pmark->u16turn_flag == OFF) {
-            g_lm.turnmark_check_dist = 0.0f;
-            g_rm.turnmark_check_dist = 0.0f;
-            pmark->fp32turnmark_dist = 0.0f;
-            pmark->fp32limit_dist = 3.0f;
-            pmark->u16turn_flag = ON;
-        } else if (pmark->fp32turnmark_dist > pmark->fp32limit_dist) {
-            pmark->u16single_flag = ON;
-            pmark->fp32limit_dist = pmark->fp32turnmark_dist + (float)g_u16turn_dist;
+    if ((pmark->u16_mark_enable & g_pos.u16_state) != 0U) {
+        if (pmark->u16_turn_flag == OFF) {
+            g_lm.fp32_turnmark_check_dist = 0.0f;
+            g_rm.fp32_turnmark_check_dist = 0.0f;
+            pmark->fp32_turnmark_dist = 0.0f;
+            pmark->fp32_limit_dist = 3.0f;
+            pmark->u16_turn_flag = ON;
+        } else if (pmark->fp32_turnmark_dist > pmark->fp32_limit_dist) {
+            pmark->u16_single_flag = ON;
+            pmark->fp32_limit_dist = pmark->fp32_turnmark_dist + (float)g_u16_turn_dist;
         }
     } else {
-        pmark->fp32turnmark_dist = 0.0f;
-        pmark->u16turn_flag = OFF;
+        pmark->fp32_turnmark_dist = 0.0f;
+        pmark->u16_turn_flag = OFF;
     }
 }
 
@@ -471,13 +471,13 @@ static void start_end_check(void)
 {
     if (g_Flag.race_start == OFF) {
         if (g_Flag.first_race == ON) {
-            search_info[0].int32turn_way = STRAIGHT;
-            g_fast_info[0].u16turn_way = STRAIGHT;
+            search_info[0].i32_turn_way = STRAIGHT;
+            g_fast_info[0].u16_turn_way = STRAIGHT;
         }
 
         g_Flag.race_start = ON;
         g_u16_turnmark_cnt = 0U;
-        g_int32mark_cnt = 0;
+        g_i32_mark_cnt = 0;
     } else {
         if (g_u16_turnmark_cnt < 1U) {
             return;
@@ -490,8 +490,8 @@ static void start_end_check(void)
 
         g_Flag.move_state = OFF;
         move_to_end(200.0f, 0.0f, 12500.0f);
-        g_lm.dist_sum = 0.0f;
-        g_rm.dist_sum = 0.0f;
+        g_lm.fp32_dist_sum = 0.0f;
+        g_rm.fp32_dist_sum = 0.0f;
         g_Flag.stop_check = ON;
     }
 }
@@ -507,31 +507,31 @@ static void line_info(turnmark_t *pmark)
     }
 
     idx = g_u16_turnmark_cnt;
-    search_info[idx].int32L_dist = (int32_t)g_lm.gone_distance;
-    search_info[idx].int32R_dist = (int32_t)g_rm.gone_distance;
-    search_info[idx].int32dist =
-        (search_info[idx].int32L_dist + search_info[idx].int32R_dist) / 2;
-    g_fast_info[idx].q17l_dist = g_lm.gone_distance;
-    g_fast_info[idx].q17r_dist = g_rm.gone_distance;
-    g_fast_info[idx].u16dist = (uint16_t)search_info[idx].int32dist;
-    g_fast_info[idx].q17angle = g_q17current_angle;
+    search_info[idx].i32_left_dist = (int32_t)g_lm.fp32_gone_distance;
+    search_info[idx].i32_right_dist = (int32_t)g_rm.fp32_gone_distance;
+    search_info[idx].i32_dist =
+        (search_info[idx].i32_left_dist + search_info[idx].i32_right_dist) / 2;
+    g_fast_info[idx].fp32_left_dist = g_lm.fp32_gone_distance;
+    g_fast_info[idx].fp32_right_dist = g_rm.fp32_gone_distance;
+    g_fast_info[idx].u16_dist = (uint16_t)search_info[idx].i32_dist;
+    g_fast_info[idx].fp32_angle = g_fp32_current_angle;
 
     if (pmark == NULL) {
-        search_info[idx].int32turn_way = END_TURN;
-        g_fast_info[idx].u16turn_way = END_TURN;
-        g_int32total_cnt = idx;
-        g_int32mark_cnt = (int32_t)idx;
-        g_lm.dist_sum = 0.0f;
-        g_rm.dist_sum = 0.0f;
-        g_lm.total_dist = 0.0f;
-        g_rm.total_dist = 0.0f;
-        g_lm.gone_distance = 0.0f;
-        g_rm.gone_distance = 0.0f;
+        search_info[idx].i32_turn_way = END_TURN;
+        g_fast_info[idx].u16_turn_way = END_TURN;
+        g_i32_total_cnt = idx;
+        g_i32_mark_cnt = (int32_t)idx;
+        g_lm.fp32_dist_sum = 0.0f;
+        g_rm.fp32_dist_sum = 0.0f;
+        g_lm.fp32_total_dist = 0.0f;
+        g_rm.fp32_total_dist = 0.0f;
+        g_lm.fp32_gone_distance = 0.0f;
+        g_rm.fp32_gone_distance = 0.0f;
         return;
     }
 
     g_u16_turnmark_cnt++;
-    g_int32mark_cnt = (int32_t)g_u16_turnmark_cnt;
+    g_i32_mark_cnt = (int32_t)g_u16_turnmark_cnt;
 
     if (pmark == &g_lmark) {
         next_way = LEFT_TURN;
@@ -542,29 +542,29 @@ static void line_info(turnmark_t *pmark)
     }
 
     if ((g_u16_turnmark_cnt > 0U) &&
-        ((int32_t)next_way == search_info[g_u16_turnmark_cnt - 1U].int32turn_way)) {
+        ((int32_t)next_way == search_info[g_u16_turnmark_cnt - 1U].i32_turn_way)) {
         next_way = STRAIGHT;
     }
 
-    search_info[g_u16_turnmark_cnt].int32turn_way = next_way;
-    g_fast_info[g_u16_turnmark_cnt].u16turn_way = next_way;
-    g_pos.u16past_state = g_pos.u16current_state;
-    g_pos.u16current_state = next_way;
-    g_int32total_cnt = g_u16_turnmark_cnt;
+    search_info[g_u16_turnmark_cnt].i32_turn_way = next_way;
+    g_fast_info[g_u16_turnmark_cnt].u16_turn_way = next_way;
+    g_pos.u16_past_state = g_pos.u16_current_state;
+    g_pos.u16_current_state = next_way;
+    g_i32_total_cnt = g_u16_turnmark_cnt;
 
-    g_lm.dist_sum = 0.0f;
-    g_rm.dist_sum = 0.0f;
-    g_lm.total_dist = 0.0f;
-    g_rm.total_dist = 0.0f;
-    g_lm.gone_distance = 0.0f;
-    g_rm.gone_distance = 0.0f;
+    g_lm.fp32_dist_sum = 0.0f;
+    g_rm.fp32_dist_sum = 0.0f;
+    g_lm.fp32_total_dist = 0.0f;
+    g_rm.fp32_total_dist = 0.0f;
+    g_lm.fp32_gone_distance = 0.0f;
+    g_rm.fp32_gone_distance = 0.0f;
 }
 
 void adc_timer_ISR(void)
 {
     uint32_t adc1_value = LL_ADC_REG_ReadConversionData12(ADC1);
     uint32_t adc2_value = LL_ADC_REG_ReadConversionData12(ADC2);
-    const scan_step_t *scan = &scan_table[g_adc_step];
+    const scan_step_t *scan = &scan_table[g_u8_adc_step];
 
     LL_ADC_ClearFlag_EOC(ADC1);
     LL_ADC_ClearFlag_EOS(ADC1);
@@ -580,9 +580,9 @@ void adc_timer_ISR(void)
     make_position();
 
     g_u32_isr_cnt++;
-    g_adc_step++;
-    if (g_adc_step >= SEN_NUM) {
-        g_adc_step = 0U;
+    g_u8_adc_step++;
+    if (g_u8_adc_step >= SEN_NUM) {
+        g_u8_adc_step = 0U;
         g_Flag.sensor_ready = ON;
         LL_TIM_DisableIT_UPDATE(TIM2);
         LL_TIM_DisableCounter(TIM2);
@@ -595,7 +595,7 @@ void sensor_tim2_irq_handler(void)
 {
     LL_TIM_ClearFlag_UPDATE(TIM2);
     LL_GPIO_ResetOutputPin(GPIOD, SENSOR_EMITTER_PINS);
-    LL_GPIO_SetOutputPin(scan_table[g_adc_step].led.port, scan_table[g_adc_step].led.pin);
+    LL_GPIO_SetOutputPin(scan_table[g_u8_adc_step].led.port, scan_table[g_u8_adc_step].led.pin);
 }
 
 void F_4095(void)
