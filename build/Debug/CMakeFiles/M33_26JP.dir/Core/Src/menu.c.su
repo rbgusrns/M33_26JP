@@ -1,0 +1,7 @@
+C:/STproject/M33_26JP/Core/Src/menu.c:49:13:_NULL_FUNC	8	static
+C:/STproject/M33_26JP/Core/Src/menu.c:55:6:menu	232	static
+C:/STproject/M33_26JP/Core/Src/menu.c:145:6:menu_start	8	static
+C:/STproject/M33_26JP/Core/Src/menu.c:157:13:menu_serial_print	32	static
+C:/STproject/M33_26JP/Core/Src/menu.c:187:13:Set_Max_Min	8	static
+C:/STproject/M33_26JP/Core/Src/menu.c:192:13:F_bril_select	8	static
+C:/STproject/M33_26JP/Core/Src/menu.c:197:13:bril_run_start	8	static

@@ -1,0 +1,16 @@
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/CMSIS/Include/core_cm33.h:2378:26:__NVIC_GetPriorityGrouping	4	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/CMSIS/Include/core_cm33.h:2390:22:__NVIC_EnableIRQ	16	static,ignoring_inline_asm
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/CMSIS/Include/core_cm33.h:2587:22:__NVIC_SetPriority	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/CMSIS/Include/core_cm33.h:2634:26:NVIC_EncodePriority	40	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_adc.h:3427:22:LL_ADC_EnableChannel0_GPIO	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_adc.h:4209:22:LL_ADC_REG_SetTriggerEdge	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_adc.h:4247:22:LL_ADC_REG_SetSamplingMode	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_adc.h:4521:22:LL_ADC_REG_SetSequencerRanks	32	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_adc.h:5652:22:LL_ADC_SetChannelSamplingTime	32	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_adc.h:5799:22:LL_ADC_SetChannelSingleDiff	24	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_adc.h:6899:22:LL_ADC_DisableDeepPowerDown	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_adc.h:6932:22:LL_ADC_EnableInternalRegulator	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_rcc.h:3427:22:LL_RCC_SetADCDACClockSource	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_bus.h:993:22:LL_AHB2_GRP1_EnableClock	24	static
+C:/STproject/M33_26JP/Core/Src/adc.c:28:6:MX_ADC1_Init	88	static
+C:/STproject/M33_26JP/Core/Src/adc.c:177:6:MX_ADC2_Init	88	static

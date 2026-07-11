@@ -1,0 +1,7 @@
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_rcc.h:3023:22:LL_RCC_SetClockSource	24	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_rcc.h:3264:22:LL_RCC_SetSPIClockSource	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_bus.h:993:22:LL_AHB2_GRP1_EnableClock	24	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_bus.h:1669:22:LL_APB1_GRP1_EnableClock	24	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_spi.h:1048:22:LL_SPI_SetStandard	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_spi.h:1591:22:LL_SPI_EnableNSSPulseMgt	16	static
+C:/STproject/M33_26JP/Core/Src/spi.c:28:6:MX_SPI3_Init	72	static

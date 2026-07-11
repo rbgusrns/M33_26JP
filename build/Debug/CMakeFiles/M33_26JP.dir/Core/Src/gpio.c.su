@@ -1,0 +1,4 @@
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_bus.h:993:22:LL_AHB2_GRP1_EnableClock	24	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_gpio.h:894:22:LL_GPIO_SetOutputPin	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_gpio.h:923:22:LL_GPIO_ResetOutputPin	16	static
+C:/STproject/M33_26JP/Core/Src/gpio.c:42:6:MX_GPIO_Init	32	static

@@ -1,0 +1,14 @@
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_tim.h:5359:22:LL_TIM_ClearFlag_UPDATE	16	static
+C:/STproject/M33_26JP/cmake/stm32cubemx/../../Drivers/STM32H5xx_HAL_Driver/Inc/stm32h5xx_ll_tim.h:5370:26:LL_TIM_IsActiveFlag_UPDATE	16	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:71:6:NMI_Handler	4	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:86:6:HardFault_Handler	4	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:101:6:MemManage_Handler	4	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:116:6:BusFault_Handler	4	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:131:6:UsageFault_Handler	4	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:146:6:SVC_Handler	4	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:159:6:DebugMon_Handler	4	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:172:6:PendSV_Handler	4	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:185:6:SysTick_Handler	8	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:206:6:TIM2_IRQHandler	8	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:220:6:TIM6_IRQHandler	8	static
+C:/STproject/M33_26JP/Core/Src/stm32h5xx_it.c:238:6:ADC2_IRQHandler	8	static
