@@ -238,7 +238,7 @@ void TIM6_IRQHandler(void)
 void ADC2_IRQHandler(void)
 {
   /* USER CODE BEGIN ADC2_IRQn 0 */
-  sensor_adc_irq_handler();
+  adc_timer_ISR();
 
   /* USER CODE END ADC2_IRQn 0 */
   /* USER CODE BEGIN ADC2_IRQn 1 */

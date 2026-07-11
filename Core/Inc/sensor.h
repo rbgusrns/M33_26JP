@@ -26,36 +26,17 @@
 #define RIGHT_TURN RTURN
 #define END_TURN   ETURN
 
-typedef struct {
-    led_pin_t led;
-    uint8_t sen_hi_idx;
-    uint8_t sen_lo_idx;
-} scan_step_t;
-
-extern const scan_step_t scan_table[SEN_NUM];
-extern volatile uint8_t g_scan_step;
-extern volatile uint8_t g_adc_step;
-
 void sen_vari_init(void);
 void sensor_scan_start(void);
 void sensor_scan_cycle_start(void);
-void sensor_adc_irq_handler(void);
 void sensor_tim2_irq_handler(void);
-void Sensor_Value(void);
 void adc_timer_ISR(void);
 void F_4095(void);
 void F_Max_min(void);
 void F_127(void);
-void F_POSCHECK(void);
-void F_CHECKMAX(void);
-void F_CHECKMIN(void);
-void F_TURNMARK(void);
-void sensor_normalize(uint8_t idx);
 void make_position(void);
 void position_PID(void);
 void handle_ad_make(float acc_rate, float dec_rate);
 void turn_decide(turnmark_t *pmark, turnmark_t *premark);
-void start_end_check(void);
-void line_info(turnmark_t *pmark);
 
 #endif /* __SENSOR_H__ */

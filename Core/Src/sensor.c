@@ -8,17 +8,19 @@
 
 #define PID_KB 0.1116352117046f
 #define PID_KA (-0.776729576590f)
-#define SENSOR_DEBUG_MIRROR_L0 0U
-#define SENSOR_DEBUG_MIRROR_L1 0U
+#define SENSOR_EMITTER_PINS ((uint32_t)L0_Pin | (uint32_t)L1_Pin | (uint32_t)L2_Pin | (uint32_t)L3_Pin | \
+                             (uint32_t)L4_Pin | (uint32_t)L5_Pin | (uint32_t)L6_Pin | (uint32_t)L7_Pin)
 
-volatile uint8_t g_scan_step;
-volatile uint8_t g_adc_step;
-static volatile uint8_t g_sensor_scan_paused;
+static volatile uint8_t g_adc_step;
 static volatile uint8_t g_sensor_scan_started;
-static uint8_t g_sensor_adc_calibrated;
-static uint8_t g_sensor_adc_irq_enabled;
 
-const scan_step_t scan_table[SEN_NUM] = {
+typedef struct {
+    led_pin_t led;
+    uint8_t sen_hi_idx;
+    uint8_t sen_lo_idx;
+} scan_step_t;
+
+static const scan_step_t scan_table[SEN_NUM] = {
     { { L0_GPIO_Port, L0_Pin }, 0U, 8U },
     { { L1_GPIO_Port, L1_Pin }, 1U, 9U },
     { { L2_GPIO_Port, L2_Pin }, 2U, 10U },
@@ -38,6 +40,8 @@ static const uint16_t state_table[18] = {
 };
 
 static void cross_check(void);
+static void start_end_check(void);
+static void line_info(turnmark_t *pmark);
 
 static const float sensor_weights[ADC_NUM] = {
     -14500.0f, -12500.0f, -10500.0f, -8500.0f,
@@ -45,154 +49,6 @@ static const float sensor_weights[ADC_NUM] = {
        500.0f,   2500.0f,   4500.0f,  6500.0f,
       8500.0f,  10500.0f,  12500.0f, 14500.0f,
 };
-
-static void sensor_emitters_off(void)
-{
-    const uint32_t pins = (uint32_t)L0_Pin | (uint32_t)L1_Pin | (uint32_t)L2_Pin | (uint32_t)L3_Pin |
-                          (uint32_t)L4_Pin | (uint32_t)L5_Pin | (uint32_t)L6_Pin | (uint32_t)L7_Pin;
-    GPIOD->BSRR = pins << 16U;
-}
-
-static void sensor_led_on(const led_pin_t *led)
-{
-    led->port->BSRR = led->pin;
-#if SENSOR_DEBUG_MIRROR_L0
-    if ((led->port == L0_GPIO_Port) && (led->pin == L0_Pin)) {
-        LED_R_GPIO_Port->BSRR = LED_R_Pin;
-    }
-#endif
-#if SENSOR_DEBUG_MIRROR_L1
-    if ((led->port == L1_GPIO_Port) && (led->pin == L1_Pin)) {
-        LED_L_GPIO_Port->BSRR = LED_L_Pin;
-    }
-#endif
-}
-
-static void sensor_led_off(const led_pin_t *led)
-{
-    led->port->BSRR = (uint32_t)led->pin << 16U;
-#if SENSOR_DEBUG_MIRROR_L0
-    if ((led->port == L0_GPIO_Port) && (led->pin == L0_Pin)) {
-        LED_R_GPIO_Port->BSRR = (uint32_t)LED_R_Pin << 16U;
-    }
-#endif
-#if SENSOR_DEBUG_MIRROR_L1
-    if ((led->port == L1_GPIO_Port) && (led->pin == L1_Pin)) {
-        LED_L_GPIO_Port->BSRR = (uint32_t)LED_L_Pin << 16U;
-    }
-#endif
-}
-
-static void sensor_set_active_step(uint8_t step)
-{
-    sensor_emitters_off();
-    sensor_led_on(&scan_table[step].led);
-}
-
-static void sensor_adc_stop(ADC_TypeDef *adc)
-{
-    if (LL_ADC_REG_IsConversionOngoing(adc) != 0U) {
-        LL_ADC_REG_StopConversion(adc);
-        while (LL_ADC_REG_IsStopConversionOngoing(adc) != 0U) {
-        }
-    }
-
-    if (LL_ADC_IsEnabled(adc) != 0U) {
-        LL_ADC_Disable(adc);
-        while (LL_ADC_IsDisableOngoing(adc) != 0U) {
-        }
-    }
-}
-
-static void sensor_adc_enable_ready(ADC_TypeDef *adc)
-{
-    if (LL_ADC_IsEnabled(adc) != 0U) {
-        return;
-    }
-
-    LL_ADC_ClearFlag_ADRDY(adc);
-    LL_ADC_Enable(adc);
-    while (LL_ADC_IsActiveFlag_ADRDY(adc) == 0U) {
-    }
-    LL_ADC_ClearFlag_ADRDY(adc);
-}
-
-static void sensor_adc_calibrate_enable(ADC_TypeDef *adc)
-{
-    volatile uint32_t wait_loop_index;
-
-    sensor_adc_stop(adc);
-    LL_ADC_StartCalibration(adc, LL_ADC_SINGLE_ENDED);
-    while (LL_ADC_IsCalibrationOnGoing(adc) != 0U) {
-    }
-
-    wait_loop_index = LL_ADC_DELAY_CALIB_ENABLE_ADC_CYCLES * 32U;
-    while (wait_loop_index != 0U) {
-        wait_loop_index--;
-    }
-
-    sensor_adc_enable_ready(adc);
-}
-
-static void sensor_adc_clear_flags(void)
-{
-    LL_ADC_ClearFlag_EOC(ADC1);
-    LL_ADC_ClearFlag_EOS(ADC1);
-    LL_ADC_ClearFlag_OVR(ADC1);
-    LL_ADC_ClearFlag_EOC(ADC2);
-    LL_ADC_ClearFlag_EOS(ADC2);
-    LL_ADC_ClearFlag_OVR(ADC2);
-}
-
-static void sensor_adc_clear_result_flags(void)
-{
-    LL_ADC_ClearFlag_EOC(ADC1);
-    LL_ADC_ClearFlag_EOS(ADC1);
-    LL_ADC_ClearFlag_EOC(ADC2);
-    LL_ADC_ClearFlag_EOS(ADC2);
-}
-
-static void sensor_adc_enable_irqs(void)
-{
-    if (g_sensor_adc_irq_enabled != 0U) {
-        return;
-    }
-
-    LL_ADC_EnableIT_OVR(ADC1);
-    LL_ADC_EnableIT_OVR(ADC2);
-    LL_ADC_EnableIT_EOC(ADC2);
-    g_sensor_adc_irq_enabled = 1U;
-}
-
-static void sensor_adc_start_pair(void)
-{
-    LL_ADC_REG_StartConversion(ADC1);
-    LL_ADC_REG_StartConversion(ADC2);
-}
-
-static void sensor_tim2_stop_trigger(void)
-{
-    LL_TIM_DisableCounter(TIM2);
-    LL_TIM_DisableIT_UPDATE(TIM2);
-    LL_TIM_CC_DisableChannel(TIM2, LL_TIM_CHANNEL_CH2);
-    LL_TIM_SetCounter(TIM2, 0U);
-    LL_TIM_GenerateEvent_UPDATE(TIM2);
-    LL_TIM_ClearFlag_UPDATE(TIM2);
-    LL_TIM_ClearFlag_CC2(TIM2);
-}
-
-static void sensor_tim2_start_trigger(void)
-{
-    LL_TIM_ClearFlag_UPDATE(TIM2);
-    LL_TIM_ClearFlag_CC2(TIM2);
-    LL_TIM_SetCounter(TIM2, 0U);
-    LL_TIM_GenerateEvent_UPDATE(TIM2);
-    LL_TIM_ClearFlag_UPDATE(TIM2);
-    LL_TIM_ClearFlag_CC2(TIM2);
-    LL_TIM_EnableIT_UPDATE(TIM2);
-    LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH2);
-    LL_TIM_EnableCounter(TIM2);
-}
 
 void sensor_scan_cycle_start(void)
 {
@@ -205,12 +61,23 @@ void sensor_scan_cycle_start(void)
     }
 
     g_adc_step = 0U;
-    g_scan_step = 0U;
     g_pos.u16state = 0U;
-    sensor_adc_clear_result_flags();
-    Sensor_Value();
-    sensor_adc_start_pair();
-    sensor_tim2_start_trigger();
+    LL_ADC_ClearFlag_EOC(ADC1);
+    LL_ADC_ClearFlag_EOS(ADC1);
+    LL_ADC_ClearFlag_EOC(ADC2);
+    LL_ADC_ClearFlag_EOS(ADC2);
+    LL_GPIO_ResetOutputPin(GPIOD, SENSOR_EMITTER_PINS);
+    LL_GPIO_SetOutputPin(scan_table[g_adc_step].led.port, scan_table[g_adc_step].led.pin);
+
+    LL_ADC_REG_StartConversion(ADC1);
+    LL_ADC_REG_StartConversion(ADC2);
+
+    LL_TIM_SetCounter(TIM2, 0U);
+    LL_TIM_ClearFlag_UPDATE(TIM2);
+    LL_TIM_ClearFlag_CC2(TIM2);
+    LL_TIM_EnableIT_UPDATE(TIM2);
+    LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH2);
+    LL_TIM_EnableCounter(TIM2);
 }
 
 void sen_vari_init(void)
@@ -235,59 +102,55 @@ void sen_vari_init(void)
     g_pos.fp32ki = POS_KI_UP;
     g_pos.fp32kd = POS_KD_UP;
     handle_ad_make(0.4f, 2.6f);
+
+    LL_ADC_ClearFlag_ADRDY(ADC1);
+    LL_ADC_Enable(ADC1);
+    while (LL_ADC_IsActiveFlag_ADRDY(ADC1) == 0U) {
+    }
+    LL_ADC_ClearFlag_ADRDY(ADC1);
+
+    LL_ADC_ClearFlag_ADRDY(ADC2);
+    LL_ADC_Enable(ADC2);
+    while (LL_ADC_IsActiveFlag_ADRDY(ADC2) == 0U) {
+    }
+    LL_ADC_ClearFlag_ADRDY(ADC2);
 }
 
 void sensor_scan_start(void)
 {
-    g_sensor_scan_paused = 1U;
-    sensor_tim2_stop_trigger();
+    LL_TIM_DisableIT_UPDATE(TIM2);
+    LL_TIM_DisableCounter(TIM2);
+    LL_TIM_ClearFlag_UPDATE(TIM2);
+    NVIC_ClearPendingIRQ(TIM2_IRQn);
 
-    if (g_sensor_adc_calibrated == 0U) {
-        sensor_adc_calibrate_enable(ADC1);
-        sensor_adc_calibrate_enable(ADC2);
-        g_sensor_adc_calibrated = 1U;
-    } else {
-        sensor_adc_enable_ready(ADC1);
-        sensor_adc_enable_ready(ADC2);
-    }
-    sensor_adc_enable_irqs();
-
-    sensor_emitters_off();
+    LL_ADC_ClearFlag_EOC(ADC1);
+    LL_ADC_ClearFlag_EOS(ADC1);
+    LL_ADC_ClearFlag_EOC(ADC2);
+    LL_ADC_ClearFlag_EOS(ADC2);
+    NVIC_ClearPendingIRQ(ADC2_IRQn);
+    LL_ADC_EnableIT_EOC(ADC2);
+    LL_GPIO_ResetOutputPin(GPIOD, SENSOR_EMITTER_PINS);
     g_sensor_scan_started = 1U;
-    g_sensor_scan_paused = 0U;
     sensor_scan_cycle_start();
 }
 
 static void sensor_scan_stop(void)
 {
-    g_sensor_scan_paused = 1U;
     g_sensor_scan_started = 0U;
-    sensor_tim2_stop_trigger();
+    LL_TIM_DisableIT_UPDATE(TIM2);
+    LL_TIM_DisableCounter(TIM2);
+    LL_TIM_ClearFlag_UPDATE(TIM2);
     NVIC_ClearPendingIRQ(TIM2_IRQn);
+    LL_ADC_DisableIT_EOC(ADC2);
     NVIC_ClearPendingIRQ(ADC2_IRQn);
-    sensor_adc_stop(ADC1);
-    sensor_adc_stop(ADC2);
-    sensor_adc_clear_flags();
-    sensor_emitters_off();
+    LL_ADC_ClearFlag_EOC(ADC1);
+    LL_ADC_ClearFlag_EOS(ADC1);
+    LL_ADC_ClearFlag_EOC(ADC2);
+    LL_ADC_ClearFlag_EOS(ADC2);
+    LL_GPIO_ResetOutputPin(GPIOD, SENSOR_EMITTER_PINS);
 }
 
-static void sensor_adc_recover_from_error(void)
-{
-    sensor_tim2_stop_trigger();
-    sensor_adc_stop(ADC1);
-    sensor_adc_stop(ADC2);
-    sensor_adc_clear_flags();
-
-    g_Flag.adc_error = ON;
-    g_u32_adc_error_cnt++;
-    sensor_emitters_off();
-
-    sensor_adc_enable_ready(ADC1);
-    sensor_adc_enable_ready(ADC2);
-    sensor_scan_cycle_start();
-}
-
-void sensor_normalize(uint8_t idx)
+static void sensor_normalize(uint8_t idx)
 {
     float val = g_sen[idx].fp32_4095_value;
     float min_val = g_sen[idx].fp32_4095_min_value;
@@ -604,7 +467,7 @@ void turn_decide(turnmark_t *pmark, turnmark_t *premark)
     }
 }
 
-void start_end_check(void)
+static void start_end_check(void)
 {
     if (g_Flag.race_start == OFF) {
         if (g_Flag.first_race == ON) {
@@ -633,7 +496,7 @@ void start_end_check(void)
     }
 }
 
-void line_info(turnmark_t *pmark)
+static void line_info(turnmark_t *pmark)
 {
     uint16_t idx;
     uint16_t next_way;
@@ -697,10 +560,17 @@ void line_info(turnmark_t *pmark)
     g_rm.gone_distance = 0.0f;
 }
 
-static void sensor_process_adc_step(uint32_t adc1_value, uint32_t adc2_value)
+void adc_timer_ISR(void)
 {
-    uint8_t step = g_adc_step;
-    const scan_step_t *scan = &scan_table[step];
+    uint32_t adc1_value = LL_ADC_REG_ReadConversionData12(ADC1);
+    uint32_t adc2_value = LL_ADC_REG_ReadConversionData12(ADC2);
+    const scan_step_t *scan = &scan_table[g_adc_step];
+
+    LL_ADC_ClearFlag_EOC(ADC1);
+    LL_ADC_ClearFlag_EOS(ADC1);
+    LL_ADC_ClearFlag_EOC(ADC2);
+    LL_ADC_ClearFlag_EOS(ADC2);
+    LL_GPIO_ResetOutputPin(scan->led.port, scan->led.pin);
 
     g_sen[scan->sen_hi_idx].fp32_4095_value = (float)adc1_value;
     g_sen[scan->sen_lo_idx].fp32_4095_value = (float)adc2_value;
@@ -709,81 +579,23 @@ static void sensor_process_adc_step(uint32_t adc1_value, uint32_t adc2_value)
     sensor_normalize(scan->sen_lo_idx);
     make_position();
 
-    sensor_led_off(&scan->led);
-
     g_u32_isr_cnt++;
-
     g_adc_step++;
     if (g_adc_step >= SEN_NUM) {
         g_adc_step = 0U;
         g_Flag.sensor_ready = ON;
-        sensor_tim2_stop_trigger();
-    } else {
-        g_scan_step = g_adc_step;
-    }
-}
-
-void adc_timer_ISR(void)
-{
-    uint32_t adc1_isr = ADC1->ISR;
-    uint32_t adc2_isr = ADC2->ISR;
-
-    if (((adc1_isr | adc2_isr) & ADC_ISR_OVR) != 0U) {
-        sensor_adc_recover_from_error();
-        return;
-    }
-
-    if ((adc2_isr & ADC_ISR_EOC) != 0U) {
-        uint32_t adc1_value = LL_ADC_REG_ReadConversionData12(ADC1);
-        uint32_t adc2_value = LL_ADC_REG_ReadConversionData12(ADC2);
-
-        LL_ADC_ClearFlag_EOC(ADC1);
-        LL_ADC_ClearFlag_EOS(ADC1);
-        LL_ADC_ClearFlag_EOC(ADC2);
-        LL_ADC_ClearFlag_EOS(ADC2);
-
-        sensor_process_adc_step(adc1_value, adc2_value);
-    }
-}
-
-void Sensor_Value(void)
-{
-    if (g_sensor_scan_paused != 0U) {
-        sensor_emitters_off();
-        return;
-    }
-
-    if (g_adc_step >= SEN_NUM) {
-        LL_TIM_DisableCounter(TIM2);
         LL_TIM_DisableIT_UPDATE(TIM2);
-        LL_TIM_SetCounter(TIM2, 0U);
-        return;
+        LL_TIM_DisableCounter(TIM2);
+        LL_TIM_ClearFlag_UPDATE(TIM2);
+        NVIC_ClearPendingIRQ(TIM2_IRQn);
     }
-
-    g_scan_step = g_adc_step;
-    sensor_set_active_step(g_scan_step);
-}
-
-void sensor_adc_irq_handler(void)
-{
-    adc_timer_ISR();
 }
 
 void sensor_tim2_irq_handler(void)
 {
-    if (g_sensor_scan_paused != 0U) {
-        if (LL_TIM_IsActiveFlag_UPDATE(TIM2) != 0U) {
-            LL_TIM_ClearFlag_UPDATE(TIM2);
-        }
-
-        sensor_emitters_off();
-        return;
-    }
-
-    if (LL_TIM_IsActiveFlag_UPDATE(TIM2) != 0U) {
-        LL_TIM_ClearFlag_UPDATE(TIM2);
-        Sensor_Value();
-    }
+    LL_TIM_ClearFlag_UPDATE(TIM2);
+    LL_GPIO_ResetOutputPin(GPIOD, SENSOR_EMITTER_PINS);
+    LL_GPIO_SetOutputPin(scan_table[g_adc_step].led.port, scan_table[g_adc_step].led.pin);
 }
 
 void F_4095(void)
@@ -906,51 +718,4 @@ void F_127(void)
         OLED_DrawSensorBars(sensor_vals);
         LL_mDelay(10U);
     } while (SW_D != 0U);
-}
-
-void F_POSCHECK(void)
-{
-    OLED_Printf(0U, 0U, "POSCHECK");
-    LL_mDelay(500U);
-
-    while (SW_D != 0U) {
-        make_position();
-        OLED_Printf(0U, 0U, "P:%6.0f", g_pos.fp32temp_position);
-        LL_mDelay(20U);
-    }
-}
-
-void F_CHECKMAX(void)
-{
-    F_Max_min();
-}
-
-void F_CHECKMIN(void)
-{
-    F_Max_min();
-}
-
-void F_TURNMARK(void)
-{
-    uint16_t cnt = 0U;
-
-    OLED_Printf(0U, 0U, "MARK:%u", (unsigned int)g_u16_turnmark_cnt);
-    LL_mDelay(1000U);
-    OLED_Printf(0U, 0U, "        ");
-
-    while (SW_D != 0U) {
-        LL_mDelay(135U);
-
-        if (SW_R == 0U) {
-            cnt++;
-        } else if ((SW_L == 0U) && (cnt > 0U)) {
-            cnt--;
-        } else if (SW_U == 0U) {
-            cnt = (uint16_t)(cnt + 10U);
-        }
-
-        OLED_Printf(0U, 0U, "T%u:%3lu",
-                    (unsigned int)cnt,
-                    (unsigned long)search_info[cnt].int32turn_way);
-    }
 }
