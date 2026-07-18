@@ -25,8 +25,10 @@ C:/STproject/M33_26JP/Core/Src/oled.c:267:6:OLED_Clear	8	static
 C:/STproject/M33_26JP/Core/Src/oled.c:277:9:OLED_IsBusy	4	static
 C:/STproject/M33_26JP/Core/Src/oled.c:282:6:OLED_Update	8	static
 C:/STproject/M33_26JP/Core/Src/oled.c:293:6:OLED_Print	24	static
-C:/STproject/M33_26JP/Core/Src/oled.c:310:6:OLED_Printf	56	static
-C:/STproject/M33_26JP/Core/Src/oled.c:325:13:OLED_DrawChar	24	static
-C:/STproject/M33_26JP/Core/Src/oled.c:355:16:OLED_UpdateBlocking	144	static
-C:/STproject/M33_26JP/Core/Src/oled.c:379:6:OLED_DrawSensorBars	32	static
-C:/STproject/M33_26JP/Core/Src/oled.c:427:6:OLED_ClearBuffer	8	static
+C:/STproject/M33_26JP/Core/Src/oled.c:310:6:OLED_PrintCentered	24	static
+C:/STproject/M33_26JP/Core/Src/oled.c:327:6:OLED_Printf	56	static
+C:/STproject/M33_26JP/Core/Src/oled.c:342:6:OLED_ShowTextScreen	24	static
+C:/STproject/M33_26JP/Core/Src/oled.c:369:13:OLED_DrawChar	24	static
+C:/STproject/M33_26JP/Core/Src/oled.c:399:16:OLED_UpdateBlocking	144	static
+C:/STproject/M33_26JP/Core/Src/oled.c:423:6:OLED_DrawSensorBars	32	static
+C:/STproject/M33_26JP/Core/Src/oled.c:471:6:OLED_ClearBuffer	8	static

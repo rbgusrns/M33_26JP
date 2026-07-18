@@ -1,4 +1,5 @@
 #include "octoflash.h"
+#include "oled.h"
 #include "octospi.h"
 #include "variable.h"
 
@@ -621,6 +622,10 @@ void octoflash_test(void)
     HAL_StatusTypeDef status;
 
     printf("OSPI TEST START\r\n");
+    OLED_ShowTextScreen("FLASH MEMORY TEST",
+                        "TESTING FLASH...",
+                        "SEE SERIAL DETAILS",
+                        "PLEASE WAIT");
 
     if (octoflash_read_jedec_id(id) != 0U) {
         printf("OSPI JEDEC ID: %02X %02X %02X\r\n",
@@ -680,6 +685,10 @@ void octoflash_test(void)
     }
 
     printf("OSPI TEST END\r\n");
+    OLED_ShowTextScreen("FLASH MEMORY TEST",
+                        "TEST COMPLETE",
+                        "SEE SERIAL RESULTS",
+                        "DOWN: RETURN");
 
     while (SW_D != 0U) {
         LL_mDelay(10U);

@@ -90,6 +90,8 @@ typedef struct {
     float fp32_pos_integral[256];
 } rom_fastinfo_t;
 
+static rom_fastinfo_t s_fastinfo_buffer;
+
 static uint32_t rom_record_addr(rom_record_id_t id)
 {
     if (id == ROM_REC_MAXMIN) {
@@ -379,34 +381,34 @@ void mark_read_rom(void)
 
 void fast_infor_write_rom(void)
 {
-    rom_fastinfo_t data;
-
     for (uint16_t i = 0U; i < 256U; i++) {
-        data.dist[i] = g_fast_info[i].u16_dist;
-        data.turn_way[i] = g_fast_info[i].u16_turn_way;
-        data.l_dist[i] = g_fast_info[i].fp32_left_dist;
-        data.r_dist[i] = g_fast_info[i].fp32_right_dist;
-        data.fp32_pos_integral[i] = g_fast_info[i].fp32_pos_integral;
+        s_fastinfo_buffer.dist[i] = g_fast_info[i].u16_dist;
+        s_fastinfo_buffer.turn_way[i] = g_fast_info[i].u16_turn_way;
+        s_fastinfo_buffer.l_dist[i] = g_fast_info[i].fp32_left_dist;
+        s_fastinfo_buffer.r_dist[i] = g_fast_info[i].fp32_right_dist;
+        s_fastinfo_buffer.fp32_pos_integral[i] = g_fast_info[i].fp32_pos_integral;
     }
 
     printf("ROM FASTINFO WRITE %s\r\n",
-           (rom_write_record(ROM_REC_FASTINFO, &data, sizeof(data)) != 0U) ? "OK" : "FAIL");
+           (rom_write_record(ROM_REC_FASTINFO,
+                             &s_fastinfo_buffer,
+                             sizeof(s_fastinfo_buffer)) != 0U) ? "OK" : "FAIL");
 }
 
 void fast_infor_read_rom(void)
 {
-    rom_fastinfo_t data;
-
-    if (rom_read_record(ROM_REC_FASTINFO, &data, sizeof(data)) == 0U) {
+    if (rom_read_record(ROM_REC_FASTINFO,
+                        &s_fastinfo_buffer,
+                        sizeof(s_fastinfo_buffer)) == 0U) {
         return;
     }
 
     for (uint16_t i = 0U; i < 256U; i++) {
-        g_fast_info[i].u16_dist = data.dist[i];
-        g_fast_info[i].u16_turn_way = data.turn_way[i];
-        g_fast_info[i].fp32_left_dist = data.l_dist[i];
-        g_fast_info[i].fp32_right_dist = data.r_dist[i];
-        g_fast_info[i].fp32_pos_integral = data.fp32_pos_integral[i];
+        g_fast_info[i].u16_dist = s_fastinfo_buffer.dist[i];
+        g_fast_info[i].u16_turn_way = s_fastinfo_buffer.turn_way[i];
+        g_fast_info[i].fp32_left_dist = s_fastinfo_buffer.l_dist[i];
+        g_fast_info[i].fp32_right_dist = s_fastinfo_buffer.r_dist[i];
+        g_fast_info[i].fp32_pos_integral = s_fastinfo_buffer.fp32_pos_integral[i];
     }
 
     printf("ROM FASTINFO READ OK\r\n");

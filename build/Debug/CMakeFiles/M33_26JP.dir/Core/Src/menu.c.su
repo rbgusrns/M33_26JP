@@ -1,4 +1,4 @@
-C:/STproject/M33_26JP/Core/Src/menu.c:46:6:menu	232	static
-C:/STproject/M33_26JP/Core/Src/menu.c:136:6:menu_start	8	static
-C:/STproject/M33_26JP/Core/Src/menu.c:148:13:menu_serial_print	32	static
-C:/STproject/M33_26JP/Core/Src/menu.c:178:13:Set_Max_Min	8	static
+C:/STproject/M33_26JP/Core/Src/menu.c:53:6:menu	32	static
+C:/STproject/M33_26JP/Core/Src/menu.c:105:6:menu_start	8	static
+C:/STproject/M33_26JP/Core/Src/menu.c:117:13:menu_serial_print	24	static
+C:/STproject/M33_26JP/Core/Src/menu.c:135:13:Set_Max_Min	8	static

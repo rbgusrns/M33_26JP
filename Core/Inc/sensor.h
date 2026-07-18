@@ -27,7 +27,8 @@
 #define END_TURN   ETURN
 
 void sen_vari_init(void);
-void sensor_scan_start(void);
+extern void sensor_scan_start(void);
+extern void sensor_scan_stop(void);
 void sensor_scan_cycle_start(void);
 void sensor_tim2_irq_handler(void);
 void adc_timer_ISR(void);

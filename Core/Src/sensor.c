@@ -61,7 +61,6 @@ void sensor_scan_cycle_start(void)
     }
 
     g_u8_adc_step = 0U;
-    g_pos.u16_state = 0U;
     LL_ADC_ClearFlag_EOC(ADC1);
     LL_ADC_ClearFlag_EOS(ADC1);
     LL_ADC_ClearFlag_EOC(ADC2);
@@ -116,7 +115,7 @@ void sen_vari_init(void)
     LL_ADC_ClearFlag_ADRDY(ADC2);
 }
 
-void sensor_scan_start(void)
+extern void sensor_scan_start(void)
 {
     LL_TIM_DisableIT_UPDATE(TIM2);
     LL_TIM_DisableCounter(TIM2);
@@ -134,7 +133,7 @@ void sensor_scan_start(void)
     sensor_scan_cycle_start();
 }
 
-static void sensor_scan_stop(void)
+extern void sensor_scan_stop(void)
 {
     g_u8_sensor_scan_started = 0U;
     LL_TIM_DisableIT_UPDATE(TIM2);
@@ -171,9 +170,8 @@ static void sensor_normalize(uint8_t idx)
 
     g_sen[idx].fp32_on_off_value = (g_sen[idx].fp32_127_value >= SENSOR_ON_THRESHOLD) ? 1.0f : 0.0f;
 
-    if (g_sen[idx].fp32_127_value >= SENSOR_STATE_THRESHOLD) {
+    if (g_sen[idx].fp32_127_value >= g_fp32_sensor_value_max) {
         g_pos.u16_state |= g_sen[idx].u16_active_arr;
-        g_Flag.lineout_flag = OFF;
     } else {
         g_pos.u16_state &= g_sen[idx].u16_passive_arr;
     }
@@ -279,6 +277,7 @@ void make_position(void)
 
     if( g_pos.fp32_sensor_sum > 0.0f )
     {
+        g_Flag.lineout_flag = OFF;
         cross_check();
 
         g_pos.fp32_weighted_sum += g_sen[g_u16_pos_cnt + 0].fp32_weight * g_sen[g_u16_pos_cnt + 0].fp32_127_value;
@@ -296,6 +295,8 @@ void make_position(void)
         g_pos.fp32_temp_position = g_pos.fp32_temp_pos;
 
         position_enable();
+    } else {
+        g_Flag.lineout_flag = ON;
     }
 }
 
@@ -392,9 +393,21 @@ static void cross_check(void)
     if (((g_pos.u16_state & state_table[state]) == state_table[state]) ||
         ((g_pos.u16_state & state_table[state - 1U]) == state_table[state - 1U]) ||
         ((g_pos.u16_state & state_table[state + 1U]) == state_table[state + 1U])) {
-        g_Flag.cross_flag = ON;
+        if (g_Flag.cross_flag == OFF) {
+            g_Flag.cross_flag = ON;
+            g_Flag.cross_shift = ON;
+        } else if (((g_lm.fp32_cross_check_dist + g_rm.fp32_cross_check_dist) * 0.5f) > 200.0f) {
+            g_Flag.lineout_flag = ON;
+        }
     } else if (g_Flag.cross_flag == ON) {
-        if (((g_lm.fp32_cross_check_dist + g_rm.fp32_cross_check_dist) * 0.5f) > 140.0f) {
+        const float cross_dist =
+            (g_lm.fp32_cross_check_dist + g_rm.fp32_cross_check_dist) * 0.5f;
+
+        if (cross_dist > 50.0f) {
+            g_Flag.cross_shift = OFF;
+        }
+
+        if (cross_dist > 140.0f) {
             g_Flag.cross_flag = OFF;
             g_lmark.u16_turn_flag = OFF;
             g_rmark.u16_turn_flag = OFF;
@@ -404,6 +417,7 @@ static void cross_check(void)
             g_rm.fp32_cross_check_dist = 0.0f;
         }
     } else {
+        g_Flag.cross_shift = OFF;
         g_lm.fp32_cross_check_dist = 0.0f;
         g_rm.fp32_cross_check_dist = 0.0f;
     }
@@ -419,6 +433,12 @@ void turn_decide(turnmark_t *pmark, turnmark_t *premark)
 
     if (pmark->u16_single_flag == ON) {
         if (pmark->fp32_turnmark_dist > pmark->fp32_limit_dist) {
+            if (pmark == &g_lmark) {
+                LL_GPIO_ResetOutputPin(LED_L_GPIO_Port, LED_L_Pin);
+            } else if (pmark == &g_rmark) {
+                LL_GPIO_ResetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
+            }
+
             if ((pmark == &g_lmark) && (premark->u16_single_flag == ON)) {
                 return;
             }
@@ -459,9 +479,19 @@ void turn_decide(turnmark_t *pmark, turnmark_t *premark)
             pmark->fp32_turnmark_dist = 0.0f;
             pmark->fp32_limit_dist = 3.0f;
             pmark->u16_turn_flag = ON;
-        } else if (pmark->fp32_turnmark_dist > pmark->fp32_limit_dist) {
+        } else if (pmark->fp32_turnmark_dist >= pmark->fp32_limit_dist) {
             pmark->u16_single_flag = ON;
-            pmark->fp32_limit_dist = pmark->fp32_turnmark_dist + (float)g_u16_turn_dist;
+            pmark->fp32_limit_dist = pmark->fp32_turnmark_dist + g_fp32_turnmark_dist;
+
+            if (g_Flag.cross_flag == OFF) {
+                if (pmark == &g_lmark) {
+                    LL_GPIO_SetOutputPin(LED_L_GPIO_Port, LED_L_Pin);
+                    g_Flag.Lturnmark_flag = ON;
+                } else if (pmark == &g_rmark) {
+                    LL_GPIO_SetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
+                    g_Flag.Rturnmark_flag = ON;
+                }
+            }
         }
     } else {
         pmark->fp32_turnmark_dist = 0.0f;
@@ -480,10 +510,18 @@ static void start_end_check(void)
         g_Flag.race_start = ON;
         g_u16_turnmark_cnt = 0U;
         g_i32_mark_cnt = 0;
+        g_lm.fp32_dist_sum = 0.0f;
+        g_rm.fp32_dist_sum = 0.0f;
+        g_lm.fp32_total_dist = 0.0f;
+        g_rm.fp32_total_dist = 0.0f;
+        g_lm.fp32_gone_distance = 0.0f;
+        g_rm.fp32_gone_distance = 0.0f;
     } else {
-        if (g_u16_turnmark_cnt < 1U) {
+        if (g_u16_turnmark_cnt < g_u16_turnmark_limit) {
             return;
         }
+
+        g_Flag.race_start = OFF;
 
         if (g_Flag.fast_flag == OFF) {
             line_info(NULL);
@@ -491,7 +529,7 @@ static void start_end_check(void)
         }
 
         g_Flag.move_state = OFF;
-        move_to_end(200.0f, 0.0f, 12500.0f);
+        move_to_end(100.0f, 0.0f, g_fp32_end_acc);
         g_lm.fp32_dist_sum = 0.0f;
         g_rm.fp32_dist_sum = 0.0f;
         g_Flag.stop_check = ON;
@@ -517,6 +555,8 @@ static void line_info(turnmark_t *pmark)
     g_fast_info[idx].fp32_right_dist = g_rm.fp32_gone_distance;
     g_fast_info[idx].u16_dist = (uint16_t)search_info[idx].i32_dist;
     g_fast_info[idx].fp32_angle = g_fp32_current_angle;
+    g_fast_info[idx].fp32_pos_integral = g_pos.fp32_integral_val;
+    g_pos.fp32_integral_val = 0.0f;
 
     if (pmark == NULL) {
         search_info[idx].i32_turn_way = END_TURN;
@@ -536,9 +576,9 @@ static void line_info(turnmark_t *pmark)
     g_i32_mark_cnt = (int32_t)g_u16_turnmark_cnt;
 
     if (pmark == &g_lmark) {
-        next_way = LEFT_TURN;
-    } else if (pmark == &g_rmark) {
         next_way = RIGHT_TURN;
+    } else if (pmark == &g_rmark) {
+        next_way = LEFT_TURN;
     } else {
         next_way = STRAIGHT;
     }
@@ -579,12 +619,12 @@ void adc_timer_ISR(void)
 
     sensor_normalize(scan->sen_hi_idx);
     sensor_normalize(scan->sen_lo_idx);
-    make_position();
 
     g_u32_isr_cnt++;
     g_u8_adc_step++;
     if (g_u8_adc_step >= SEN_NUM) {
         g_u8_adc_step = 0U;
+        make_position();
         g_Flag.sensor_ready = ON;
         LL_TIM_DisableIT_UPDATE(TIM2);
         LL_TIM_DisableCounter(TIM2);
@@ -660,7 +700,10 @@ void F_Max_min(void)
 {
     uint8_t serial_div = 0U;
 
-    OLED_Printf(0U, 0U, "LOADING_");
+    OLED_ShowTextScreen("SENSOR CALIBRATION",
+                        "INITIALIZING...",
+                        "CLEARING OLD VALUES",
+                        "PLEASE WAIT");
     LL_mDelay(500U);
 
     for (uint8_t idx = 0U; idx < ADC_NUM; idx++) {
@@ -668,11 +711,14 @@ void F_Max_min(void)
         g_sen[idx].fp32_4095_min_value = 4095.0f;
     }
 
-    printf("Set_MAX_\r\n");
+    printf("CAPTURE SENSOR MAX\r\n");
+    OLED_ShowTextScreen("CAPTURE MAX VALUES",
+                        "MOVE OVER WHITE LINE",
+                        "SCANNING...",
+                        "RIGHT: NEXT");
     while (SW_R != 0U) {
-        OLED_Printf(0U, 0U, "Set_MAX_");
         if (serial_div >= 20U) {
-            printf("Set_MAX_\r\n");
+            printf("CAPTURE SENSOR MAX\r\n");
             serial_div = 0U;
         }
         serial_div++;
@@ -685,11 +731,14 @@ void F_Max_min(void)
     }
 
     serial_div = 0U;
-    printf("Set_MIN_\r\n");
+    printf("CAPTURE SENSOR MIN\r\n");
+    OLED_ShowTextScreen("CAPTURE MIN VALUES",
+                        "PLACE ON DARK FLOOR",
+                        "SCANNING...",
+                        "DOWN: SAVE");
     while (SW_D != 0U) {
-        OLED_Printf(0U, 0U, "Set_MIN_");
         if (serial_div >= 20U) {
-            printf("Set_MIN_\r\n");
+            printf("CAPTURE SENSOR MIN\r\n");
             serial_div = 0U;
         }
         serial_div++;
@@ -704,7 +753,11 @@ void F_Max_min(void)
     sensor_scan_stop();
     maxmin_write_rom();
     sensor_scan_start();
-    
+    OLED_ShowTextScreen("SENSOR CALIBRATION",
+                        "CALIBRATION SAVED",
+                        "MAX / MIN UPDATED",
+                        "RETURNING TO MENU");
+    LL_mDelay(500U);
 }
 
 void F_127(void)

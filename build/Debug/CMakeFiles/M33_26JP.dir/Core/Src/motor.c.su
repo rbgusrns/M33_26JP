@@ -51,4 +51,4 @@ C:/STproject/M33_26JP/Core/Src/motor.c:557:6:motor_500us_irq_handler	32	static
 C:/STproject/M33_26JP/Core/Src/motor.c:614:13:motor_pwm_test_apply	16	static
 C:/STproject/M33_26JP/Core/Src/motor.c:623:13:motor_pwm_test_oled	48	static
 C:/STproject/M33_26JP/Core/Src/motor.c:640:6:motor_pwm_test	24	static
-C:/STproject/M33_26JP/Core/Src/motor.c:717:6:motor_encoder_test	72	static
+C:/STproject/M33_26JP/Core/Src/motor.c:717:6:motor_encoder_test	120	static

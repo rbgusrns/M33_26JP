@@ -307,6 +307,23 @@ void OLED_Print(uint8_t row, uint8_t col, const char *str)
     }
 }
 
+void OLED_PrintCentered(uint8_t row, const char *str)
+{
+    uint8_t length = 0U;
+
+    if (str == NULL)
+    {
+        return;
+    }
+
+    while ((str[length] != '\0') && (length < OLED_TEXT_COLUMNS))
+    {
+        length++;
+    }
+
+    OLED_Print(row, (uint8_t)((OLED_TEXT_COLUMNS - length) / 2U), str);
+}
+
 void OLED_Printf(uint8_t row, uint8_t col, const char *fmt, ...)
 {
     char buf[OLED_TEXT_BUFFER_SIZE];
@@ -320,6 +337,33 @@ void OLED_Printf(uint8_t row, uint8_t col, const char *fmt, ...)
     OLED_Update();
 }
 
+
+void OLED_ShowTextScreen(const char *title,
+                         const char *line1,
+                         const char *line2,
+                         const char *line3)
+{
+    OLED_ClearBuffer();
+
+    if (title != NULL)
+    {
+        OLED_PrintCentered(0U, title);
+    }
+    if (line1 != NULL)
+    {
+        OLED_Print(1U, 0U, line1);
+    }
+    if (line2 != NULL)
+    {
+        OLED_Print(2U, 0U, line2);
+    }
+    if (line3 != NULL)
+    {
+        OLED_Print(3U, 0U, line3);
+    }
+
+    OLED_Update();
+}
 
 static void OLED_DrawChar(uint8_t x, uint8_t page, char ch)
 {

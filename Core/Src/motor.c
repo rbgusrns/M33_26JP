@@ -155,7 +155,7 @@ static void suction_esc_test_oled(uint16_t pulse_us, const char *line2, const ch
 
     snprintf(pwm_line, sizeof(pwm_line), "PWM: %4uus", (unsigned int)pulse_us);
     OLED_ClearBuffer();
-    OLED_Print(0U, 0U, "SUCTION TEST");
+    OLED_PrintCentered(0U, "SUCTION TEST");
     OLED_Print(1U, 0U, pwm_line);
     OLED_Print(2U, 0U, line2);
     OLED_Print(3U, 0U, line3);
@@ -604,7 +604,7 @@ void motor_500us_irq_handler(void)
         motor_stop();
     }
 
-    if (g_Flag.start_flag == ON) {
+    if (g_Flag.race_start == ON) {
         g_i32_timer_cnt++;
     }
 
@@ -630,7 +630,7 @@ static void motor_pwm_test_oled(uint8_t selected_motor, uint16_t pwm)
              (selected_motor == 0U) ? 'L' : 'R',
              (unsigned int)pwm);
     OLED_ClearBuffer();
-    OLED_Print(0U, 0U, "MOTOR PWM TEST");
+    OLED_PrintCentered(0U, "MOTOR PWM TEST");
     OLED_Print(1U, 0U, status_line);
     OLED_Print(2U, 0U, "U:+1000 L:L R:R");
     OLED_Print(3U, 0U, "D:STOP/EXIT");
@@ -695,7 +695,7 @@ void motor_pwm_test(void)
     motor_stop();
     printf("MOTOR PWM TEST END\r\n");
     OLED_ClearBuffer();
-    OLED_Print(0U, 0U, "MOTOR PWM TEST");
+    OLED_PrintCentered(0U, "MOTOR PWM TEST");
     OLED_Print(1U, 0U, "STOP PWM:0");
     OLED_Print(3U, 0U, "TEST END");
     OLED_Update();
@@ -739,6 +739,8 @@ void motor_encoder_test(void)
         uint32_t tick_delta;
         int32_t left_vel;
         int32_t right_vel;
+        char left_line[OLED_TEXT_COLUMNS + 1U];
+        char right_line[OLED_TEXT_COLUMNS + 1U];
 
         LL_mDelay(100U);
 
@@ -766,6 +768,23 @@ void motor_encoder_test(void)
                (long)i32_right_count,
                (long)i32_right_delta,
                (long)right_vel);
+
+        snprintf(left_line,
+                 sizeof(left_line),
+                 "L:%ld V:%ldmm/s",
+                 (long)i32_left_count,
+                 (long)left_vel);
+        snprintf(right_line,
+                 sizeof(right_line),
+                 "R:%ld V:%ldmm/s",
+                 (long)i32_right_count,
+                 (long)right_vel);
+        OLED_ClearBuffer();
+        OLED_PrintCentered(0U, "ENCODER TEST");
+        OLED_Print(1U, 0U, left_line);
+        OLED_Print(2U, 0U, right_line);
+        OLED_Print(3U, 0U, "DOWN: EXIT");
+        OLED_Update();
 
         prev_left_count = i32_left_count;
         prev_right_count = i32_right_count;

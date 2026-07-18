@@ -25,11 +25,18 @@
 int32_t row = 0;
 int32_t column = 0;
 
-char menu_sel[ROW][COLUMN][9] = {
-    {"MAX_MIN_", "__4095__", "SEN_127_", "Set_MARK", "ENC_TEST"},
-    {"Set_VELO", "Set_ACC_", "Set_HAND", "Set_MPID", "Set_PPID"},
-    {"1st_RACE", "2nd_RACE", "fst_info", "brl_info", "OSPI_TST"},
-    {"Bril_ctl", "SUC_TEST", "PWM_TEST", "SFT_CTRL", "__GYRO__"}
+char menu_sel[ROW][COLUMN][OLED_TEXT_COLUMNS + 1U] = {
+    {"SENSOR CALIBRATION", "RAW SENSOR VALUES", "SENSOR BAR GRAPH", "TURN MARK SETUP", "ENCODER TEST"},
+    {"VELOCITY SETUP", "ACCELERATION SETUP", "HANDLE SETUP", "MOTOR PID SETUP", "POSITION PID SETUP"},
+    {"FIRST RACE", "SECOND RACE", "FAST RUN INFO", "BRILLIANT INFO", "FLASH MEMORY TEST"},
+    {"EXTREME SETUP", "SUCTION TEST", "MOTOR PWM TEST", "SHIFT RATIO SETUP", "GYRO TEST"}
+};
+
+static const char *const menu_category[ROW] = {
+    "SENSOR SETTINGS",
+    "MOTOR SETTINGS",
+    "RACE OPERATIONS",
+    "ADVANCED / TESTS"
 };
 
 static void Set_Max_Min(void);
@@ -84,51 +91,13 @@ void menu(void)
 
     OLED_ClearBuffer();
 
-    char cat_buf[40];
-    const char *cat_name = "";
-    if (row == 0) {
-        cat_name = "SENSOR";
-    } else if (row == 1) {
-        cat_name = "MOTOR";
-    } else if (row == 2) {
-        cat_name = "RACE";
-    } else if (row == 3) {
-        cat_name = "EXT";
-    }
-
-    char temp_cat[32];
-    snprintf(temp_cat, sizeof(temp_cat), "%s GROUP", cat_name);
-    int pad_cat = (21 - (int)strlen(temp_cat)) / 2;
-    if (pad_cat < 0) pad_cat = 0;
-    if (pad_cat > 20) pad_cat = 20;
-    memset(cat_buf, ' ', (size_t)pad_cat);
-    cat_buf[pad_cat] = '\0';
-    snprintf(cat_buf + pad_cat, sizeof(cat_buf) - (size_t)pad_cat, "%s", temp_cat);
-
-    char scroll_buf[40];
     char dots[10] = "o o o o o";
     dots[column * 2] = '*';
-    int pad_scroll = (21 - (int)strlen(dots)) / 2;
-    if (pad_scroll < 0) pad_scroll = 0;
-    if (pad_scroll > 20) pad_scroll = 20;
-    memset(scroll_buf, ' ', (size_t)pad_scroll);
-    scroll_buf[pad_scroll] = '\0';
-    snprintf(scroll_buf + pad_scroll, sizeof(scroll_buf) - (size_t)pad_scroll, "%s", dots);
 
-    char item_buf[40];
-    char temp_item[32];
-    snprintf(temp_item, sizeof(temp_item), "> %s <", menu_sel[row][column]);
-    int pad_item = (21 - (int)strlen(temp_item)) / 2;
-    if (pad_item < 0) pad_item = 0;
-    if (pad_item > 20) pad_item = 20;
-    memset(item_buf, ' ', (size_t)pad_item);
-    item_buf[pad_item] = '\0';
-    snprintf(item_buf + pad_item, sizeof(item_buf) - (size_t)pad_item, "%s", temp_item);
-
-    OLED_Print(0U, 0U, cat_buf);
-    OLED_Print(1U, 0U, scroll_buf);
-    OLED_Print(2U, 0U, item_buf);
-
+    OLED_PrintCentered(0U, menu_category[row]);
+    OLED_PrintCentered(1U, dots);
+    OLED_PrintCentered(2U, menu_sel[row][column]);
+    OLED_PrintCentered(3U, "UP:OPEN L/R:SELECT");
     OLED_Update();
     menu_serial_print();
 }
@@ -149,26 +118,14 @@ static void menu_serial_print(void)
 {
     static int32_t prev_row = -1;
     static int32_t prev_column = -1;
-    const char *cat_name = "";
-
     if ((prev_row == row) && (prev_column == column)) {
         return;
     }
 
-    if (row == 0) {
-        cat_name = "SENSOR";
-    } else if (row == 1) {
-        cat_name = "MOTOR";
-    } else if (row == 2) {
-        cat_name = "RACE";
-    } else if (row == 3) {
-        cat_name = "EXT";
-    }
-
-    printf("MENU [%ld,%ld] %-6s %s\r\n",
+    printf("MENU [%ld,%ld] %-16s %s\r\n",
            (long)row,
            (long)column,
-           cat_name,
+           menu_category[row],
            menu_sel[row][column]);
 
     prev_row = row;

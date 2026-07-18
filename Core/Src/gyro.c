@@ -1,4 +1,5 @@
 #include "gyro.h"
+#include "oled.h"
 #include "spi.h"
 #include "variable.h"
 
@@ -222,14 +223,29 @@ uint8_t LSM6DSR_ReadGyroZ(int16_t *raw_z, float *dps_z)
 void Gyro_test(void)
 {
     int32_t angle_x100 = 0;
+    uint8_t oled_div = 0U;
 
     printf("GYRO TEST START\r\n");
     if (LSM6DSR_Init() == 0U) {
         printf("GYRO TEST END\r\n");
+        OLED_ShowTextScreen("GYRO TEST",
+                            "INITIALIZATION FAIL",
+                            "CHECK SPI / SENSOR",
+                            "DOWN: RETURN");
+        while (SW_D != 0U) {
+            LL_mDelay(10U);
+        }
+        while (SW_D == 0U) {
+            LL_mDelay(10U);
+        }
         return;
     }
 
     printf("Right: angle reset, Down: exit\r\n");
+    OLED_ShowTextScreen("GYRO TEST",
+                        "DPS: +0.00",
+                        "ANGLE: +0.00",
+                        "RIGHT:ZERO DOWN:EXIT");
 
     while (SW_D != 0U) {
         int16_t raw_z = 0;
@@ -266,8 +282,43 @@ void Gyro_test(void)
                    angle_sign,
                    (unsigned long)(angle_abs / 100U),
                    (unsigned long)(angle_abs % 100U));
+
+            if (oled_div == 0U) {
+                char dps_line[OLED_TEXT_COLUMNS + 1U];
+                char angle_line[OLED_TEXT_COLUMNS + 1U];
+
+                snprintf(dps_line,
+                         sizeof(dps_line),
+                         "DPS: %c%lu.%02lu",
+                         dps_sign,
+                         (unsigned long)(dps_abs / 100U),
+                         (unsigned long)(dps_abs % 100U));
+                snprintf(angle_line,
+                         sizeof(angle_line),
+                         "ANGLE: %c%lu.%02lu",
+                         angle_sign,
+                         (unsigned long)(angle_abs / 100U),
+                         (unsigned long)(angle_abs % 100U));
+                OLED_ClearBuffer();
+                OLED_PrintCentered(0U, "GYRO TEST");
+                OLED_Print(1U, 0U, dps_line);
+                OLED_Print(2U, 0U, angle_line);
+                OLED_Print(3U, 0U, "RIGHT:ZERO DOWN:EXIT");
+                OLED_Update();
+            }
         } else {
             printf("GYRO READ FAIL\r\n");
+            if (oled_div == 0U) {
+                OLED_ShowTextScreen("GYRO TEST",
+                                    "SENSOR READ FAILED",
+                                    "RETRYING...",
+                                    "DOWN: EXIT");
+            }
+        }
+
+        oled_div++;
+        if (oled_div >= 5U) {
+            oled_div = 0U;
         }
 
         if (SW_R == 0U) {

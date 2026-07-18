@@ -24,6 +24,21 @@ static uint8_t s_route_save_pending;
 #define TURN_270_DIST 1400U
 
 static void turn_division_compute(fast_run_str *pinfo, int32_t mark_cnt, error_str *perr);
+static void search_route_save_prompt(void);
+
+static void search_process_turn_marks(void)
+{
+    if (g_Flag.move_state == OFF) {
+        return;
+    }
+
+    g_lmark.fp32_turnmark_dist =
+        (g_lm.fp32_turnmark_check_dist + g_rm.fp32_turnmark_check_dist) * 0.5f;
+    g_rmark.fp32_turnmark_dist = g_lmark.fp32_turnmark_dist;
+
+    turn_decide(&g_lmark, &g_rmark);
+    turn_decide(&g_rmark, &g_lmark);
+}
 
 static void search_wait_key_release(void)
 {
@@ -32,19 +47,119 @@ static void search_wait_key_release(void)
     }
 }
 
+static const char *search_setting_title(const char *tag)
+{
+    if (strcmp(tag, "VEL") == 0) return "USER VELOCITY";
+    if (strcmp(tag, "LMIT") == 0) return "END MARK LIMIT";
+    if (strcmp(tag, "THOLD") == 0) return "SENSOR THRESHOLD";
+    if (strcmp(tag, "MARKD") == 0) return "TURN MARK DISTANCE";
+    if (strcmp(tag, "MARKT") == 0) return "TURN MARK THRESHOLD";
+    if (strcmp(tag, "errflg") == 0) return "FAST ERROR CHECK";
+    if (strcmp(tag, "IS") == 0) return "SEARCH INNER HANDLE";
+    if (strcmp(tag, "OS") == 0) return "SEARCH OUTER HANDLE";
+    if (strcmp(tag, "IF") == 0) return "FAST INNER HANDLE";
+    if (strcmp(tag, "OF") == 0) return "FAST OUTER HANDLE";
+    if (strcmp(tag, "EDV") == 0) return "END VELOCITY";
+    if (strcmp(tag, "AC") == 0) return "USER ACCELERATION";
+    if (strcmp(tag, "Pkp") == 0) return "POSITION KP";
+    if (strcmp(tag, "Pkd") == 0) return "POSITION KD";
+    if (strcmp(tag, "Mkp") == 0) return "MOTOR KP";
+    if (strcmp(tag, "Mkd") == 0) return "MOTOR KD";
+    if (strcmp(tag, "level") == 0) return "SHIFT LEVEL";
+    if (strcmp(tag, "45V") == 0) return "45 DEG VELOCITY";
+    if (strcmp(tag, "45A") == 0) return "45 DEG ACCEL";
+    if (strcmp(tag, "s4s") == 0) return "STRAIGHT-45 SPEED";
+    if (strcmp(tag, "s44s") == 0) return "45-45 SPEED";
+    if (strcmp(tag, "escp") == 0) return "45 ESCAPE SPEED";
+    if (strcmp(tag, "STR") == 0) return "STRAIGHT RETURN";
+    if (strcmp(tag, "RTN") == 0) return "RETURN RATIO";
+    if (strcmp(tag, "SFR") == 0) return "SHIFT RATIO";
+    return tag;
+}
+
+static const char *search_setting_adjust_hint(const char *tag)
+{
+    if ((strcmp(tag, "VEL") == 0) ||
+        (strcmp(tag, "EDV") == 0) ||
+        (strcmp(tag, "45V") == 0) ||
+        (strcmp(tag, "s4s") == 0) ||
+        (strcmp(tag, "s44s") == 0) ||
+        (strcmp(tag, "escp") == 0)) {
+        return "UP/DOWN: +/-100";
+    }
+    if (strcmp(tag, "AC") == 0) return "UP/DOWN: +/-500";
+    if (strcmp(tag, "45A") == 0) return "UP/DOWN: +/-200";
+    if ((strcmp(tag, "IS") == 0) ||
+        (strcmp(tag, "OS") == 0) ||
+        (strcmp(tag, "IF") == 0) ||
+        (strcmp(tag, "OF") == 0) ||
+        (strcmp(tag, "Mkp") == 0) ||
+        (strcmp(tag, "Mkd") == 0)) {
+        return "UP/DOWN: +/-0.01";
+    }
+    if ((strcmp(tag, "Pkp") == 0) || (strcmp(tag, "Pkd") == 0)) {
+        return "UP/DOWN: +/-0.1";
+    }
+    if ((strcmp(tag, "STR") == 0) ||
+        (strcmp(tag, "RTN") == 0) ||
+        (strcmp(tag, "SFR") == 0)) {
+        return "UP/DOWN: +/-10";
+    }
+    if (strcmp(tag, "errflg") == 0) return "UP: ON / DOWN: OFF";
+    return "UP/DOWN: +/-1";
+}
+
+static void search_show_setting(const char *tag, const char *value_line)
+{
+    OLED_ClearBuffer();
+    OLED_PrintCentered(0U, search_setting_title(tag));
+    OLED_PrintCentered(1U, value_line);
+    OLED_Print(2U, 0U, search_setting_adjust_hint(tag));
+    OLED_Print(3U, 0U, "RIGHT: SAVE / NEXT");
+    OLED_Update();
+}
+
 static void search_print_float_setting(const char *tag, float value)
 {
-    printf("%s:%ld.%03ld\r\n",
-           tag,
-           (long)value,
-           (long)((value - (float)((long)value)) * 1000.0f));
-    OLED_Printf(0U, 0U, "%s:%4ld", tag, (long)value);
+    char value_line[OLED_TEXT_COLUMNS + 1U];
+    long scaled_value = (long)(value * 1000.0f);
+    unsigned long absolute_value;
+
+    if (scaled_value < 0L) {
+        absolute_value = (unsigned long)(-scaled_value);
+        snprintf(value_line,
+                 sizeof(value_line),
+                 "VALUE: -%lu.%03lu",
+                 absolute_value / 1000UL,
+                 absolute_value % 1000UL);
+    } else {
+        absolute_value = (unsigned long)scaled_value;
+        snprintf(value_line,
+                 sizeof(value_line),
+                 "VALUE: %lu.%03lu",
+                 absolute_value / 1000UL,
+                 absolute_value % 1000UL);
+    }
+
+    printf("%s:%s\r\n", tag, &value_line[7]);
+    search_show_setting(tag, value_line);
 }
 
 static void search_print_int_setting(const char *tag, long value)
 {
+    char value_line[OLED_TEXT_COLUMNS + 1U];
+
+    if (strcmp(tag, "errflg") == 0) {
+        snprintf(value_line,
+                 sizeof(value_line),
+                 "VALUE: %s",
+                 (value != 0L) ? "ON" : "OFF");
+    } else {
+        snprintf(value_line, sizeof(value_line), "VALUE: %ld", value);
+    }
+
     printf("%s:%ld\r\n", tag, value);
-    OLED_Printf(0U, 0U, "%s:%4ld", tag, value);
+    search_show_setting(tag, value_line);
 }
 
 static void search_route_clear(void)
@@ -106,6 +221,8 @@ void Race_Init(void)
     g_Flag.err = OFF;
     g_Flag.fast_flag = OFF;
     g_Flag.cross_shift = OFF;
+    LL_GPIO_ResetOutputPin(LED_L_GPIO_Port, LED_L_Pin);
+    LL_GPIO_ResetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
 
     s_lineout_cnt = 0U;
     s_route_save_pending = 0U;
@@ -116,15 +233,25 @@ void Race_Init(void)
     g_fp32_straight_dist = 0.0f;
     g_fp32_turn_angle = 0.0f;
     g_fp32_current_angle = 0.0f;
+    g_pos.fp32_temp_pos = 0.0f;
+    g_pos.fp32_temp_position = 0.0f;
+    g_pos.u16_enable = 0xFFFFU;
+    g_pos.u16_current_state = STRAIGHT;
+    g_pos.u16_past_state = STRAIGHT;
+    g_lmark.u16_mark_enable = LEFT_MARK_CHECK;
     g_lmark.u16_cross_flag = OFF;
     g_lmark.u16_single_flag = OFF;
     g_lmark.u16_turn_flag = OFF;
+    g_rmark.u16_mark_enable = RIGHT_MARK_CHECK;
     g_rmark.u16_cross_flag = OFF;
     g_rmark.u16_single_flag = OFF;
     g_rmark.u16_turn_flag = OFF;
 
+    if (g_i32_shift_level > 8) {
+        g_i32_shift_level = 8;
+    }
+
     motor_reset_motion_state();
-    handle_ad_make(0.4f, 2.6f);
 }
 
 void search_route_save_request(void)
@@ -132,17 +259,66 @@ void search_route_save_request(void)
     s_route_save_pending = 1U;
 }
 
+static void search_route_save_prompt(void)
+{
+    OLED_ShowTextScreen("FIRST RACE COMPLETE",
+                        "ROUTE DATA READY",
+                        "RIGHT: SAVE ROUTE",
+                        "DOWN: DISCARD");
+
+    while (1) {
+        if (SW_R == 0U) {
+            search_wait_key_release();
+
+            if (s_route_save_pending != 0U) {
+                sensor_scan_stop();
+                fast_infor_write_rom();
+                mark_write_rom();
+                sensor_scan_start();
+                s_route_save_pending = 0U;
+                OLED_ShowTextScreen("ROUTE DATA SAVED",
+                                    "TURN MARKS SAVED",
+                                    "DISTANCES SAVED",
+                                    "RETURNING TO MENU");
+            } else {
+                OLED_ShowTextScreen("ROUTE SAVE SKIPPED",
+                                    "NO ROUTE DATA",
+                                    "NOTHING WAS WRITTEN",
+                                    "RETURNING TO MENU");
+            }
+
+            LL_mDelay(700U);
+            motor_enable_control(OFF);
+            return;
+        }
+
+        if (SW_D == 0U) {
+            s_route_save_pending = 0U;
+            OLED_ShowTextScreen("ROUTE NOT SAVED",
+                                "NEW DATA DISCARDED",
+                                "FLASH NOT CHANGED",
+                                "RELEASE DOWN KEY");
+            search_wait_key_release();
+            LL_mDelay(500U);
+            motor_enable_control(OFF);
+            return;
+        }
+
+        LL_mDelay(10U);
+    }
+}
+
 void search_run_start(void)
 {
     search_route_clear();
     Race_Init();
-    make_position();
+    handle_ad_make(g_fp32_out_corner_limit, g_fp32_in_corner_limit);
 
     move_to_move(SEARCH_DEFAULT_DIST_MM,
                  0.0f,
                  g_fp32_user_vel,
                  g_fp32_user_vel,
-                 g_fp32_user_acc);
+                 SEARCH_DEFAULT_ACC_MM_S2);
 
     g_Flag.move_state = ON;
     g_Flag.start_flag = ON;
@@ -151,32 +327,43 @@ void search_run_start(void)
 
 void search_run(void)
 {
+    char speed_line[OLED_TEXT_COLUMNS + 1U];
+
     printf("Sch_%ld\r\n", (long)g_fp32_user_vel);
-    OLED_Printf(0U, 0U, "Sch_%4ld", (long)g_fp32_user_vel);
+    snprintf(speed_line, sizeof(speed_line), "SPEED: %ld mm/s", (long)g_fp32_user_vel);
+    OLED_ShowTextScreen("FIRST RACE", speed_line, "READY TO START", "DOWN: ABORT");
+    LL_mDelay(1000U);
+    OLED_ShowTextScreen("FIRST RACE", speed_line, "RUNNING...", "DOWN: ABORT");
     LL_mDelay(500U);
 
     search_run_start();
 
     while (1) {
-        make_position();
+        search_process_turn_marks();
 
         if (g_Flag.motor_ISR_flag == ON) {
             g_Flag.motor_ISR_flag = OFF;
 
             if (line_out_func() != 0) {
-                printf("SEARCH LINEOUT\r\n");
+                OLED_ShowTextScreen("FIRST RACE",
+                                    "LINE OUT DETECTED",
+                                    "MOTOR STOPPED",
+                                    "DOWN: RETURN");
                 return;
             }
 
             if (race_stop_check() != 0) {
-                printf("SEARCH STOP\r\n");
+                search_route_save_prompt();
                 return;
             }
         }
 
         if (SW_D == 0U) {
             search_run_stop();
-            printf("SEARCH ABORT\r\n");
+            OLED_ShowTextScreen("FIRST RACE",
+                                "USER ABORT",
+                                "MOTOR STOPPED",
+                                "RELEASE DOWN KEY");
             search_wait_key_release();
             return;
         }
@@ -367,8 +554,11 @@ void bril_info(void)
 
 void fast_run(void)
 {
+    char speed_line[OLED_TEXT_COLUMNS + 1U];
+
     printf("fast_run\r\n");
-    OLED_Printf(0U, 0U, "FAST %4ld", (long)g_fp32_user_vel);
+    snprintf(speed_line, sizeof(speed_line), "SPEED: %ld mm/s", (long)g_fp32_user_vel);
+    OLED_ShowTextScreen("SECOND RACE", speed_line, "PREPARING ROUTE", "DOWN: ABORT");
     LL_mDelay(500U);
     second_run((fast_run_str *)g_fast_info);
 }
@@ -612,7 +802,10 @@ void fast_error_compute(error_str *perr, fast_run_str *pinfo, int32_t mark_cnt)
     if ((g_i32_fast_error_flag != 0) &&
         ((g_i32_err_cnt > 10) || (mark_cnt > (g_i32_total_cnt - 1)))) {
         printf("FAST ERROR\r\n");
-        OLED_Printf(0U, 0U, "FAST ERR");
+        OLED_ShowTextScreen("SECOND RACE ERROR",
+                            "ROUTE SYNC FAILED",
+                            "CONTROLLED STOP",
+                            "DOWN: RETURN");
         g_Flag.err = ON;
         g_Flag.fast_flag = OFF;
         move_to_move(1000.0f, 0.0f, 1000.0f, 1000.0f, 5000.0f);
@@ -646,7 +839,10 @@ void second_run(fast_run_str *pinfo)
 
     if ((pinfo == NULL) || (g_i32_total_cnt <= 0)) {
         printf("FAST NO ROUTE total=%ld\r\n", (long)g_i32_total_cnt);
-        OLED_Printf(0U, 0U, "NO ROUTE");
+        OLED_ShowTextScreen("SECOND RACE",
+                            "NO ROUTE DATA",
+                            "RUN FIRST RACE",
+                            "DOWN: RETURN");
         LL_mDelay(500U);
         return;
     }
@@ -655,8 +851,11 @@ void second_run(fast_run_str *pinfo)
     turn_info_func();
     turn_division_func();
 
+    char speed_line[OLED_TEXT_COLUMNS + 1U];
+
     printf("FAST START total=%ld vel=%ld\r\n", (long)g_i32_total_cnt, (long)g_fp32_user_vel);
-    OLED_Printf(0U, 0U, "Fst_%4ld", (long)g_fp32_user_vel);
+    snprintf(speed_line, sizeof(speed_line), "SPEED: %ld mm/s", (long)g_fp32_user_vel);
+    OLED_ShowTextScreen("SECOND RACE", speed_line, "RUNNING...", "DOWN: ABORT");
     LL_mDelay(500U);
 
     handle_ad_make(g_fp32_out_corner_fast_limit, g_fp32_in_corner_fast_limit);
@@ -684,6 +883,10 @@ void second_run(fast_run_str *pinfo)
 
             if (line_out_func() != 0) {
                 printf("FAST LINEOUT\r\n");
+                OLED_ShowTextScreen("SECOND RACE",
+                                    "LINE OUT DETECTED",
+                                    "MOTOR STOPPED",
+                                    "DOWN: RETURN");
                 return;
             }
 
@@ -692,6 +895,10 @@ void second_run(fast_run_str *pinfo)
 
             if (race_stop_check() != 0) {
                 printf("FAST STOP\r\n");
+                OLED_ShowTextScreen("SECOND RACE",
+                                    "END MARK DETECTED",
+                                    "RACE COMPLETE",
+                                    "DOWN: RETURN");
                 return;
             }
         }
@@ -699,6 +906,10 @@ void second_run(fast_run_str *pinfo)
         if (SW_D == 0U) {
             search_run_stop();
             printf("FAST ABORT\r\n");
+            OLED_ShowTextScreen("SECOND RACE",
+                                "USER ABORT",
+                                "MOTOR STOPPED",
+                                "RELEASE DOWN KEY");
             search_wait_key_release();
             return;
         }
@@ -1139,6 +1350,8 @@ void search_run_stop(void)
 {
     move_to_end(100.0f, 0.0f, 12500.0f);
     motor_enable_control(OFF);
+    LL_GPIO_ResetOutputPin(LED_L_GPIO_Port, LED_L_Pin);
+    LL_GPIO_ResetOutputPin(LED_R_GPIO_Port, LED_R_Pin);
     g_Flag.move_state = OFF;
     g_Flag.start_flag = OFF;
     g_Flag.stop_check = ON;
@@ -1146,11 +1359,25 @@ void search_run_stop(void)
 
 int line_out_func(void)
 {
+    if (g_Flag.stop_check == ON) {
+        return 0;
+    }
+
     if (g_Flag.lineout_flag == ON) {
         s_lineout_cnt++;
 
-        if (s_lineout_cnt > 1000U) {
-            search_run_stop();
+        if (s_lineout_cnt >= 200U) {
+            s_lineout_cnt = 0U;
+            g_Flag.move_state = OFF;
+            g_Flag.stop_check = ON;
+            move_to_end(100.0f, 0.0f, 13000.0f);
+
+            while ((g_lm.fp32_next_vel >= 30.0f) &&
+                   (g_rm.fp32_next_vel >= 30.0f)) {
+            }
+
+            motor_enable_control(OFF);
+            g_Flag.start_flag = OFF;
             return 1;
         }
     } else {
@@ -1167,11 +1394,8 @@ int race_stop_check(void)
     }
 
     if ((g_lm.fp32_next_vel < 30.0f) && (g_rm.fp32_next_vel < 30.0f)) {
-        motor_enable_control(OFF);
-        if ((s_route_save_pending != 0U) && (g_Flag.fast_flag == OFF)) {
-            s_route_save_pending = 0U;
-            fast_infor_write_rom();
-            mark_write_rom();
+        if ((s_route_save_pending == 0U) || (g_Flag.fast_flag != OFF)) {
+            motor_enable_control(OFF);
         }
         return 1;
     }
@@ -1186,14 +1410,7 @@ void search_run_task(void)
     }
 
     g_Flag.motor_ISR_flag = OFF;
-    make_position();
-
-    if (g_Flag.move_state == ON) {
-        g_lmark.fp32_turnmark_dist = (g_lm.fp32_turnmark_check_dist + g_rm.fp32_turnmark_check_dist) * 0.5f;
-        g_rmark.fp32_turnmark_dist = g_lmark.fp32_turnmark_dist;
-        turn_decide(&g_lmark, &g_rmark);
-        turn_decide(&g_rmark, &g_lmark);
-    }
+    search_process_turn_marks();
 
     (void)line_out_func();
     (void)race_stop_check();
