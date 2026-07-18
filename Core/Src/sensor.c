@@ -267,33 +267,35 @@ static float sensor_clampf(float value, float min_value, float max_value)
 
 void make_position(void)
 {
-    uint8_t i;
-    uint8_t base = (uint8_t)g_u16_pos_cnt;
-
     g_pos.fp32_sensor_sum = 0.0f;
     g_pos.fp32_weighted_sum = 0.0f;
 
-    if (base > 12U) {
-        base = 12U;
-        g_u16_pos_cnt = 12U;
-    }
-
-    for (i = 0U; i < 4U; i++) {
-        uint8_t idx = (uint8_t)(base + i);
-        g_pos.fp32_sensor_sum += g_sen[idx].fp32_127_value;
-        g_pos.fp32_weighted_sum += g_sen[idx].fp32_weight * g_sen[idx].fp32_127_value;
-    }
+    g_pos.fp32_sensor_sum += g_sen[g_u16_pos_cnt + 0].fp32_127_value;
+    g_pos.fp32_sensor_sum += g_sen[g_u16_pos_cnt + 1].fp32_127_value;
+    g_pos.fp32_sensor_sum += g_sen[g_u16_pos_cnt + 2].fp32_127_value;
+    g_pos.fp32_sensor_sum += g_sen[g_u16_pos_cnt + 3].fp32_127_value;
 
     g_pos.fp32_position_sum = g_pos.fp32_sensor_sum;
-    if (g_pos.fp32_sensor_sum > 0.0f) {
+
+    if( g_pos.fp32_sensor_sum > 0.0f )
+    {
         cross_check();
-        g_pos.fp32_temp_pos = g_pos.fp32_weighted_sum / g_pos.fp32_sensor_sum;
-        g_pos.fp32_temp_pos = sensor_clampf(g_pos.fp32_temp_pos, -POS_END, POS_END);
+
+        g_pos.fp32_weighted_sum += g_sen[g_u16_pos_cnt + 0].fp32_weight * g_sen[g_u16_pos_cnt + 0].fp32_127_value;
+        g_pos.fp32_weighted_sum += g_sen[g_u16_pos_cnt + 1].fp32_weight * g_sen[g_u16_pos_cnt + 1].fp32_127_value;
+        g_pos.fp32_weighted_sum += g_sen[g_u16_pos_cnt + 2].fp32_weight * g_sen[g_u16_pos_cnt + 2].fp32_127_value;
+        g_pos.fp32_weighted_sum += g_sen[g_u16_pos_cnt + 3].fp32_weight * g_sen[g_u16_pos_cnt + 3].fp32_127_value;
+
+        g_pos.fp32_temp_pos = g_pos.fp32_weighted_sum / g_pos.fp32_position_sum;
+
+        if( g_pos.fp32_temp_pos >= POS_END )
+            g_pos.fp32_temp_pos = POS_END;
+        else if( g_pos.fp32_temp_pos <= -POS_END )
+            g_pos.fp32_temp_pos = -POS_END;
+
         g_pos.fp32_temp_position = g_pos.fp32_temp_pos;
-        g_Flag.lineout_flag = OFF;
+
         position_enable();
-    } else {
-        g_Flag.lineout_flag = ON;
     }
 }
 

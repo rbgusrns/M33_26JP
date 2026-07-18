@@ -289,7 +289,7 @@ void print_second_info(void)
 
     printf("SECOND INFO total=%ld\r\n", (long)g_i32_total_cnt);
     for (i = 0; i <= stop; i++) {
-        printf("%ld| dst:%5u| dec:%5ld| mdst:%5ld| turn_dir:0x%04X| way:0x%04X| acc:%5ld| in:%5ld| fp32_vel:%5ld| out:%5ld| cnt:%u| down:%u| s44s:%u| escape:%u| ready:%u| bril:%u| fp32_kp:%ld.%02ld| RDIST:%ld| LDIST:%ld| P:%ld| fp32_angle:%ld\r\n",
+        printf("%ld| dst:%5u| dec:%5ld| mdst:%5ld| turn_dir:0x%04X| way:0x%04X| acc:%5ld| in:%5ld| vel:%5ld| out:%5ld| cnt:%u| down:%u| s44s:%u| escape:%u| ready:%u| bril:%u| kp:%ld.%02ld| RDIST:%ld| LDIST:%ld| P:%ld| angle:%ld\r\n",
                (long)i,
                (unsigned int)g_fast_info[i].u16_dist,
                (long)g_fast_info[i].fp32_decel_dist,
@@ -348,7 +348,7 @@ void bril_info(void)
     print_second_info();
 
     for (i = 0; i <= stop; i++) {
-        printf("%ld| turn_dir:%5x| sft_after:%ld| sft_before:%ld| fp32_dist_limit:%5ld| dst:%5u| err_dst:%5ld| under_dst:%5ld| fp32_bril_pos:%ld\r\n",
+        printf("%ld| turn_dir:%5x| sft_after:%ld| sft_before:%ld| dist_limit:%5ld| dst:%5u| err_dst:%5ld| under_dst:%5ld| bril_pos:%ld\r\n",
                (long)i,
                (unsigned int)g_fast_info[i].u16_turn_dir,
                (long)g_fast_info[i].fp32_shift_after,
@@ -655,7 +655,7 @@ void second_run(fast_run_str *pinfo)
     turn_info_func();
     turn_division_func();
 
-    printf("FAST START total=%ld fp32_vel=%ld\r\n", (long)g_i32_total_cnt, (long)g_fp32_user_vel);
+    printf("FAST START total=%ld vel=%ld\r\n", (long)g_i32_total_cnt, (long)g_fp32_user_vel);
     OLED_Printf(0U, 0U, "Fst_%4ld", (long)g_fp32_user_vel);
     LL_mDelay(500U);
 
@@ -725,7 +725,7 @@ void Set_Velocity(void)
             break;
         }
 
-        search_print_float_setting("fp32_vel", g_fp32_user_vel);
+        search_print_float_setting("VEL", g_fp32_user_vel);
         LL_mDelay(20U);
     }
 }

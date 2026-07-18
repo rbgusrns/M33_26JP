@@ -29,13 +29,10 @@ char menu_sel[ROW][COLUMN][9] = {
     {"MAX_MIN_", "__4095__", "SEN_127_", "Set_MARK", "ENC_TEST"},
     {"Set_VELO", "Set_ACC_", "Set_HAND", "Set_MPID", "Set_PPID"},
     {"1st_RACE", "2nd_RACE", "fst_info", "brl_info", "OSPI_TST"},
-    {"Bril_ctl", "_ MODE _", "Brl_RACE", "SFT_CTRL", "__GYRO__"}
+    {"Bril_ctl", "SUC_TEST", "PWM_TEST", "SFT_CTRL", "__GYRO__"}
 };
 
-static void _NULL_FUNC(void);
 static void Set_Max_Min(void);
-static void F_bril_select(void);
-static void bril_run_start(void);
 static void menu_serial_print(void);
 
 void (* menu_functions[ROW][COLUMN])(void) =
@@ -43,14 +40,8 @@ void (* menu_functions[ROW][COLUMN])(void) =
     {Set_Max_Min,    F_4095,        F_127,        Set_TurnMark,   motor_encoder_test},
     {Set_Velocity,   Set_Accel,     Set_Handle,   Set_MotorPID,   Set_PosPID},
     {search_run,     fast_run,      fst_info,     bril_info,      octoflash_test},
-    {extreme_ctl,    F_bril_select, bril_run_start, Set_ShiftRatio, Gyro_test}
+    {extreme_ctl,    suction_esc_test, motor_pwm_test, Set_ShiftRatio, Gyro_test}
 };
-
-static void _NULL_FUNC(void)
-{
-    OLED_Printf(0U, 0U, "NOTTING_");
-    LL_mDelay(500U);
-}
 
 void menu(void)
 {
@@ -187,14 +178,4 @@ static void menu_serial_print(void)
 static void Set_Max_Min(void)
 {
     F_Max_min();
-}
-
-static void F_bril_select(void)
-{
-    _NULL_FUNC();
-}
-
-static void bril_run_start(void)
-{
-    _NULL_FUNC();
 }

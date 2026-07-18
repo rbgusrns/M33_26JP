@@ -112,13 +112,14 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_TIM1_Init();
+  suction_esc_calibration();
   MX_ADC1_Init();
   MX_ADC2_Init();
   MX_I2C1_Init();
   MX_ICACHE_Init();
   MX_OCTOSPI1_Init();
   MX_SPI3_Init();
-  MX_TIM1_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
   MX_TIM8_Init();

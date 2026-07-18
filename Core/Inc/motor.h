@@ -63,8 +63,10 @@ void decel_dist_compute(float fp32_cur_vel, float tar_vel, float acc, float *fp3
 void diffvel_to_remaindist_cpt(float fp32_cur_vel, float tar_vel, float acc, float *fp32_decel_dist);
 void max_vel_compute(float dist, float minus_dist, float fp32_cur_vel, float acc, float limit_vel, float min_vel, float *max_vel);
 void suction_esc_set_us(uint16_t pulse_us);
+void suction_esc_calibration(void);
 void suction_esc_test(void);
 void motor_500us_irq_handler(void);
 void motor_encoder_test(void);
+void motor_pwm_test(void);
 
 #endif /* __MOTOR_H__ */

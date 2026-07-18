@@ -15,11 +15,12 @@
 #define MOTOR_DEFAULT_KD             0.62f
 #define MOTOR_MAX_PID_OUT            7700.0f
 #define MOTOR_MIN_PID_OUT           -7700.0f
-#define MOTOR_ESC_TEST_START_US      1150U
+#define MOTOR_ESC_TEST_START_US      MOTOR_ESC_MIN_US
 #define MOTOR_ESC_TEST_MAX_US        1900U
-#define MOTOR_ESC_TEST_STEP_US       10U
-#define MOTOR_LEFT_ENCODER_SIGN      1
-#define MOTOR_RIGHT_ENCODER_SIGN     1
+#define MOTOR_ESC_TEST_STEP_US       200U
+#define MOTOR_PWM_TEST_STEP          1000U
+#define MOTOR_LEFT_ENCODER_SIGN     -1
+#define MOTOR_RIGHT_ENCODER_SIGN    -1
 
 motor_feedback_t g_motor_feedback;
 motor_axis_t g_lm;
@@ -103,11 +104,11 @@ static void motor_set_left_direction(int16_t pwm)
 static void motor_set_right_direction(int16_t pwm)
 {
     if (pwm > 0) {
-        LL_GPIO_SetOutputPin(BIN1_GPIO_Port, BIN1_Pin);
-        LL_GPIO_ResetOutputPin(BIN2_GPIO_Port, BIN2_Pin);
-    } else if (pwm < 0) {
         LL_GPIO_ResetOutputPin(BIN1_GPIO_Port, BIN1_Pin);
         LL_GPIO_SetOutputPin(BIN2_GPIO_Port, BIN2_Pin);
+    } else if (pwm < 0) {
+        LL_GPIO_SetOutputPin(BIN1_GPIO_Port, BIN1_Pin);
+        LL_GPIO_ResetOutputPin(BIN2_GPIO_Port, BIN2_Pin);
     } else {
         LL_GPIO_ResetOutputPin(BIN1_GPIO_Port, BIN1_Pin);
         LL_GPIO_ResetOutputPin(BIN2_GPIO_Port, BIN2_Pin);
@@ -141,10 +142,56 @@ void suction_esc_set_us(uint16_t pulse_us)
     LL_TIM_OC_SetCompareCH1(TIM1, clamped);
 }
 
-static void suction_esc_wait_switch_release(void)
+static void motor_wait_switch_release(void)
 {
     while ((SW_U == 0U) || (SW_D == 0U) || (SW_R == 0U) || (SW_L == 0U)) {
         LL_mDelay(10U);
+    }
+}
+
+static void suction_esc_test_oled(uint16_t pulse_us, const char *line2, const char *line3)
+{
+    char pwm_line[22];
+
+    snprintf(pwm_line, sizeof(pwm_line), "PWM: %4uus", (unsigned int)pulse_us);
+    OLED_ClearBuffer();
+    OLED_Print(0U, 0U, "SUCTION TEST");
+    OLED_Print(1U, 0U, pwm_line);
+    OLED_Print(2U, 0U, line2);
+    OLED_Print(3U, 0U, line3);
+    OLED_Update();
+}
+
+void suction_esc_calibration(void)
+{
+    if (SW_D != 0U) {
+        return;
+    }
+
+    suction_esc_set_us(MOTOR_ESC_MAX_US);
+    LL_TIM_GenerateEvent_UPDATE(TIM1);
+    LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
+    LL_TIM_EnableAllOutputs(TIM1);
+    LL_TIM_EnableCounter(TIM1);
+
+    while (SW_R != 0U) {
+        if (SW_L == 0U) {
+            suction_esc_set_us(MOTOR_ESC_MIN_US);
+            LL_TIM_GenerateEvent_UPDATE(TIM1);
+            while (SW_L == 0U) {
+            }
+        } else if (SW_U == 0U) {
+            suction_esc_set_us(MOTOR_ESC_MAX_US);
+            LL_TIM_GenerateEvent_UPDATE(TIM1);
+            while (SW_U == 0U) {
+            }
+        }
+    }
+
+    suction_esc_set_us(MOTOR_ESC_MIN_US);
+    LL_TIM_GenerateEvent_UPDATE(TIM1);
+
+    while (SW_R == 0U) {
     }
 }
 
@@ -157,19 +204,20 @@ void suction_esc_test(void)
     motor_stop();
     suction_esc_set_us(MOTOR_ESC_SAFE_US);
 
-    printf("ESC TEST START\r\n");
+    printf("SUCTION TEST START\r\n");
     printf("ARM LOW=%uus for 3s\r\n", (unsigned int)MOTOR_ESC_SAFE_US);
-    suction_esc_set_us(MOTOR_ESC_SAFE_US);
-    LL_mDelay(3000U);
+    suction_esc_test_oled(MOTOR_ESC_SAFE_US, "ARMING...", "WAIT 0.5 SEC");
+    LL_mDelay(500U);
 
     printf("START=%uus MAX=%uus STEP=%uus\r\n",
            (unsigned int)MOTOR_ESC_TEST_START_US,
            (unsigned int)MOTOR_ESC_TEST_MAX_US,
            (unsigned int)MOTOR_ESC_TEST_STEP_US);
-    printf("UP:+%uus LEFT:-%uus RIGHT:MAX DOWN:STOP/EXIT\r\n",
+    printf("UP:+%uus LEFT:-%uus DOWN:STOP/EXIT\r\n",
            (unsigned int)MOTOR_ESC_TEST_STEP_US,
            (unsigned int)MOTOR_ESC_TEST_STEP_US);
-    suction_esc_wait_switch_release();
+    motor_wait_switch_release();
+    suction_esc_test_oled(pulse_us, "UP:+1 LEFT:-1", "DOWN:STOP");
 
     while (SW_D != 0U) {
         if (SW_U == 0U) {
@@ -179,9 +227,6 @@ void suction_esc_test(void)
                 pulse_us = MOTOR_ESC_TEST_MAX_US;
             }
             LL_mDelay(120U);
-        } else if (SW_R == 0U) {
-            pulse_us = MOTOR_ESC_TEST_MAX_US;
-            LL_mDelay(160U);
         } else if (SW_L == 0U) {
             if (pulse_us >= (MOTOR_ESC_TEST_START_US + MOTOR_ESC_TEST_STEP_US)) {
                 pulse_us = (uint16_t)(pulse_us - MOTOR_ESC_TEST_STEP_US);
@@ -193,16 +238,19 @@ void suction_esc_test(void)
 
         suction_esc_set_us(pulse_us);
         if (last_print_us != pulse_us) {
-            printf("ESC PWM: %uus\r\n", (unsigned int)pulse_us);
+            printf("SUCTION PWM: %uus\r\n", (unsigned int)pulse_us);
+            suction_esc_test_oled(pulse_us, "UP:+10 LEFT:-10", "DOWN:STOP");
             last_print_us = pulse_us;
         }
         LL_mDelay(40U);
     }
 
     suction_esc_set_us(MOTOR_ESC_SAFE_US);
-    printf("ESC TEST END, PWM=%uus\r\n", (unsigned int)MOTOR_ESC_SAFE_US);
+    LL_TIM_GenerateEvent_UPDATE(TIM1);
+    printf("SUCTION TEST END, PWM=%uus\r\n", (unsigned int)MOTOR_ESC_SAFE_US);
+    suction_esc_test_oled(MOTOR_ESC_SAFE_US, "TEST END", "SAFE OUTPUT");
 
-    suction_esc_wait_switch_release();
+    motor_wait_switch_release();
     LL_mDelay(300U);
 }
 
@@ -561,6 +609,109 @@ void motor_500us_irq_handler(void)
     }
 
     sensor_scan_cycle_start();
+}
+
+static void motor_pwm_test_apply(uint8_t selected_motor, uint16_t pwm)
+{
+    if (selected_motor == 0U) {
+        motor_set_pwm((int16_t)pwm, 0);
+    } else {
+        motor_set_pwm(0, (int16_t)pwm);
+    }
+}
+
+static void motor_pwm_test_oled(uint8_t selected_motor, uint16_t pwm)
+{
+    char status_line[22];
+
+    snprintf(status_line,
+             sizeof(status_line),
+             "SEL:%c PWM:%5u",
+             (selected_motor == 0U) ? 'L' : 'R',
+             (unsigned int)pwm);
+    OLED_ClearBuffer();
+    OLED_Print(0U, 0U, "MOTOR PWM TEST");
+    OLED_Print(1U, 0U, status_line);
+    OLED_Print(2U, 0U, "U:+1000 L:L R:R");
+    OLED_Print(3U, 0U, "D:STOP/EXIT");
+    OLED_Update();
+}
+
+void motor_pwm_test(void)
+{
+    uint8_t selected_motor = 0U;
+    uint16_t pwm = 0U;
+    uint32_t tim6_it_enabled = LL_TIM_IsEnabledIT_UPDATE(TIM6);
+    uint32_t tim6_irq_enabled = NVIC_GetEnableIRQ(TIM6_IRQn);
+
+    motor_enable_control(OFF);
+    LL_TIM_DisableIT_UPDATE(TIM6);
+    NVIC_DisableIRQ(TIM6_IRQn);
+    NVIC_ClearPendingIRQ(TIM6_IRQn);
+    LL_TIM_ClearFlag_UPDATE(TIM6);
+    motor_stop();
+    motor_wait_switch_release();
+
+    printf("MOTOR PWM TEST START\r\n");
+    printf("UP:+%u LEFT:L RIGHT:R DOWN:STOP/EXIT\r\n",
+           (unsigned int)MOTOR_PWM_TEST_STEP);
+    motor_pwm_test_oled(selected_motor, pwm);
+
+    while (SW_D != 0U) {
+        uint8_t changed = 0U;
+
+        if (SW_U == 0U) {
+            if (pwm <= (MOTOR_PWM_PERIOD - MOTOR_PWM_TEST_STEP)) {
+                pwm = (uint16_t)(pwm + MOTOR_PWM_TEST_STEP);
+            } else {
+                pwm = MOTOR_PWM_PERIOD;
+            }
+            changed = 1U;
+            while (SW_U == 0U) {
+            }
+        } else if (SW_L == 0U) {
+            selected_motor = 0U;
+            changed = 1U;
+            while (SW_L == 0U) {
+            }
+        } else if (SW_R == 0U) {
+            selected_motor = 1U;
+            changed = 1U;
+            while (SW_R == 0U) {
+            }
+        }
+
+        if (changed != 0U) {
+            motor_pwm_test_apply(selected_motor, pwm);
+            motor_pwm_test_oled(selected_motor, pwm);
+            printf("MOTOR PWM SEL=%c PWM=%u\r\n",
+                   (selected_motor == 0U) ? 'L' : 'R',
+                   (unsigned int)pwm);
+        }
+
+        LL_mDelay(10U);
+    }
+
+    motor_stop();
+    printf("MOTOR PWM TEST END\r\n");
+    OLED_ClearBuffer();
+    OLED_Print(0U, 0U, "MOTOR PWM TEST");
+    OLED_Print(1U, 0U, "STOP PWM:0");
+    OLED_Print(3U, 0U, "TEST END");
+    OLED_Update();
+
+    while (SW_D == 0U) {
+    }
+
+    LL_TIM_ClearFlag_UPDATE(TIM6);
+    NVIC_ClearPendingIRQ(TIM6_IRQn);
+    if (tim6_it_enabled != 0U) {
+        LL_TIM_EnableIT_UPDATE(TIM6);
+    }
+    if (tim6_irq_enabled != 0U) {
+        NVIC_EnableIRQ(TIM6_IRQn);
+    }
+    LL_mDelay(300U);
 }
 
 void motor_encoder_test(void)

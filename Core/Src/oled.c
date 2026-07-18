@@ -229,13 +229,13 @@ void OLED_Init(void)
         (OLED_Cmd(0x20U) == 0U) ||
         (OLED_Cmd(0x00U) == 0U) ||
         (OLED_Cmd(0xB0U) == 0U) ||
-        (OLED_Cmd(0xC8U) == 0U) ||
+        (OLED_Cmd(0xC0U) == 0U) ||
         (OLED_Cmd(0x00U) == 0U) ||
         (OLED_Cmd(0x10U) == 0U) ||
         (OLED_Cmd(0x40U) == 0U) ||
         (OLED_Cmd(0x81U) == 0U) ||
         (OLED_Cmd(0x7FU) == 0U) ||
-        (OLED_Cmd(0xA1U) == 0U) ||
+        (OLED_Cmd(0xA0U) == 0U) ||
         (OLED_Cmd(0xA6U) == 0U) ||
         (OLED_Cmd(0xA8U) == 0U) ||
         (OLED_Cmd(OLED_MULTIPLEX_RATIO) == 0U) ||
