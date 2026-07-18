@@ -319,6 +319,14 @@ void position_PID(void)
     float pid_mix;
     const float center_step = HANDLE_CENTER / 250.0f;
     const float pid_step = g_pos.fp32_pid_out / 250.0f;
+    uint8_t fast_straight = 0U;
+
+    if ((g_Flag.fast_flag == ON) &&
+        (g_i32_mark_cnt >= 0) &&
+        (g_i32_mark_cnt < 256) &&
+        ((g_fast_info[g_i32_mark_cnt].u16_turn_dir & STRAIGHT) != 0U)) {
+        fast_straight = 1U;
+    }
 
     g_pos.fp32_pos_iir_puted = g_pos.fp32_pos_iir_puting;
     g_pos.fp32_pos_iir_puting = g_pos.fp32_temp_pos;
@@ -342,15 +350,33 @@ void position_PID(void)
         g_fp32_right_handle_temp = (g_fp32_handle_dec_step * (center_step - pid_step)) + g_fp32_handle_dec_max;
         g_fp32_left_handle_temp = (g_fp32_handle_acc_step * (center_step + pid_step)) + g_fp32_handle_acc_max;
 
-        if (g_fp32_right_handle_temp < 0.0f) {
+        if ((g_Flag.fast_flag == OFF) && (g_fp32_right_handle_temp < 0.0f)) {
             g_fp32_right_handle_temp = 0.0f;
+        } else if (fast_straight != 0U) {
+            if (g_fp32_left_handle_temp > MAX_SPEED_HANDLE) {
+                g_fp32_left_handle_temp = MAX_SPEED_HANDLE;
+            }
+            if (g_fp32_right_handle_temp < -MAX_SPEED_HANDLE) {
+                g_fp32_right_handle_temp = -MAX_SPEED_HANDLE;
+            }
+        } else if ((g_Flag.fast_flag == ON) && (g_fp32_right_handle_temp < -0.05f)) {
+            g_fp32_right_handle_temp = -0.05f;
         }
     } else {
         g_fp32_right_handle_temp = (g_fp32_handle_acc_step * (center_step - pid_step)) + g_fp32_handle_acc_max;
         g_fp32_left_handle_temp = (g_fp32_handle_dec_step * (center_step + pid_step)) + g_fp32_handle_dec_max;
 
-        if (g_fp32_left_handle_temp < 0.0f) {
+        if ((g_Flag.fast_flag == OFF) && (g_fp32_left_handle_temp < 0.0f)) {
             g_fp32_left_handle_temp = 0.0f;
+        } else if (fast_straight != 0U) {
+            if (g_fp32_right_handle_temp > MAX_SPEED_HANDLE) {
+                g_fp32_right_handle_temp = MAX_SPEED_HANDLE;
+            }
+            if (g_fp32_left_handle_temp < -MAX_SPEED_HANDLE) {
+                g_fp32_left_handle_temp = -MAX_SPEED_HANDLE;
+            }
+        } else if ((g_Flag.fast_flag == ON) && (g_fp32_left_handle_temp < -0.05f)) {
+            g_fp32_left_handle_temp = -0.05f;
         }
     }
 
@@ -517,7 +543,7 @@ static void start_end_check(void)
         g_lm.fp32_gone_distance = 0.0f;
         g_rm.fp32_gone_distance = 0.0f;
     } else {
-        if (g_u16_turnmark_cnt < g_u16_turnmark_limit) {
+        if ((uint32_t)g_i32_mark_cnt < (uint32_t)g_u16_turnmark_limit) {
             return;
         }
 

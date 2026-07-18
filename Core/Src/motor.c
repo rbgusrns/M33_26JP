@@ -313,7 +313,7 @@ void max_vel_compute(float dist, float minus_dist, float fp32_cur_vel, float acc
         usable_dist = 0.0f;
     }
 
-    fp32_vel = motor_sqrtf((fp32_cur_vel * fp32_cur_vel) + (2.0f * acc * usable_dist));
+    fp32_vel = motor_sqrtf((fp32_cur_vel * fp32_cur_vel) + ( acc * usable_dist));
     fp32_vel = motor_clampf(fp32_vel, min_vel, limit_vel);
     *max_vel = fp32_vel;
 }

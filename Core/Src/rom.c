@@ -422,7 +422,7 @@ void rom_load_all(void)
     acc_info_read_rom();
     handle_read_rom();
     turnmark_info_read_rom();
-    //extvel_read_rom();
-    //mark_read_rom();
-    //fast_infor_read_rom();
+    extvel_read_rom();
+    mark_read_rom();
+    fast_infor_read_rom();
 }

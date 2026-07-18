@@ -509,10 +509,8 @@ void print_second_info(void)
 void fst_info(void)
 {
     printf("fst_info\r\n");
-    if (g_i32_total_cnt <= 0) {
-        mark_read_rom();
-        fast_infor_read_rom();
-    }
+    mark_read_rom();
+    fast_infor_read_rom();
     turn_info_func();
     turn_division_func();
     print_second_info();
@@ -616,7 +614,7 @@ static void straight_compute(fast_run_str *pinfo, int32_t mark_cnt, error_str *p
     }
 
     perr->fp32_err_dist[mark_cnt] += (float)pinfo->u16_dist;
-    perr->fp32_under_dist[mark_cnt] = (float)pinfo->u16_dist * 0.9f;
+    perr->fp32_under_dist[mark_cnt] = (float)pinfo->u16_dist * 0.7f;
 }
 
 static void default_turn_compute(fast_run_str *pinfo, int32_t mark_cnt, error_str *perr)
@@ -630,14 +628,14 @@ static void default_turn_compute(fast_run_str *pinfo, int32_t mark_cnt, error_st
     pinfo->fp32_out_vel = pinfo->fp32_in_vel;
 
     perr->fp32_err_dist[mark_cnt] = ((float)pinfo->u16_dist * 0.5f) + (float)pinfo->u16_dist;
-    perr->fp32_under_dist[mark_cnt] = (float)pinfo->u16_dist * 0.9f;
+    perr->fp32_under_dist[mark_cnt] = (float)pinfo->u16_dist * 0.65f;
 
     if (((pinfo->u16_turn_dir & TURN_45) != 0U) &&
         (((pinfo + 1)->u16_turn_dir & (TURN_45 | TURN_90)) != 0U)) {
         pinfo->u16_speed_up_45 = ON;
         pinfo->fp32_kp = 0.15f;
         perr->fp32_err_dist[mark_cnt] = (float)(pinfo->u16_dist << 2);
-        perr->fp32_under_dist[mark_cnt] = (float)pinfo->u16_dist * 0.9f;
+        perr->fp32_under_dist[mark_cnt] = (float)pinfo->u16_dist * 0.5f;
     }
 }
 
@@ -696,7 +694,7 @@ void large_turn_compute(fast_run_str *pinfo, int32_t mark_cnt, error_str *perr)
     }
 
     perr->fp32_err_dist[mark_cnt] += (float)pinfo->u16_dist;
-    perr->fp32_under_dist[mark_cnt] = (float)pinfo->u16_dist * 0.9f;
+    perr->fp32_under_dist[mark_cnt] = (float)pinfo->u16_dist * 0.65f;
 }
 
 static void turn_division_compute(fast_run_str *pinfo, int32_t mark_cnt, error_str *perr)
@@ -743,7 +741,7 @@ void second_infor(fast_run_str *pinfo, error_str *perr)
 
     g_i32_mark_cnt++;
 
-    if (g_i32_mark_cnt > (g_i32_total_cnt + 5)) {
+    if (g_i32_mark_cnt > g_i32_total_cnt) {
         g_Flag.err = ON;
         g_lm.fp32_gone_distance = 0.0f;
         g_rm.fp32_gone_distance = 0.0f;
@@ -752,10 +750,8 @@ void second_infor(fast_run_str *pinfo, error_str *perr)
 
     if (((pinfo + g_i32_mark_cnt)->u16_turn_dir & (STRAIGHT | LARGE_TURN | ETURN)) != 0U) {
         g_Flag.speed_up_start = ON;
-        g_lmark.u16_mark_enable = FRONT_MARK_CHECK;
     } else {
         g_Flag.straight_run = OFF;
-        g_lmark.u16_mark_enable = LEFT_MARK_CHECK;
     }
 
     move_to_move((float)(pinfo + g_i32_mark_cnt)->u16_dist,
@@ -832,10 +828,8 @@ void fast_error_compute(error_str *perr, fast_run_str *pinfo, int32_t mark_cnt)
 
 void second_run(fast_run_str *pinfo)
 {
-    if (g_i32_total_cnt <= 0) {
-        mark_read_rom();
-        fast_infor_read_rom();
-    }
+    mark_read_rom();
+    fast_infor_read_rom();
 
     if ((pinfo == NULL) || (g_i32_total_cnt <= 0)) {
         printf("FAST NO ROUTE total=%ld\r\n", (long)g_i32_total_cnt);
@@ -869,14 +863,7 @@ void second_run(fast_run_str *pinfo)
 
     while (1) {
         g_fp32_straight_dist = (g_rm.fp32_gone_distance + g_lm.fp32_gone_distance) * 0.5f;
-        make_position();
-
-        if (g_Flag.move_state == ON) {
-            g_lmark.fp32_turnmark_dist = (g_lm.fp32_turnmark_check_dist + g_rm.fp32_turnmark_check_dist) * 0.5f;
-            g_rmark.fp32_turnmark_dist = g_lmark.fp32_turnmark_dist;
-            turn_decide(&g_lmark, &g_rmark);
-            turn_decide(&g_rmark, &g_lmark);
-        }
+        search_process_turn_marks();
 
         if (g_Flag.motor_ISR_flag == ON) {
             g_Flag.motor_ISR_flag = OFF;
