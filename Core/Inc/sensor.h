@@ -7,8 +7,11 @@
 #define ADC_NUM 16U
 #define LEFT_ENABLE  0x003FU
 #define RIGHT_ENABLE 0xFC00U
-#define LEFT_MARK_CHECK  0xF000U
-#define RIGHT_MARK_CHECK 0x000FU
+#define LINE_TRACK_CHECK       0x3FFCU /* S2..S13: main line and cross area */
+#define CROSS_LOW_WING_CHECK   0x003CU /* S2..S5: normally over black */
+#define CROSS_HIGH_WING_CHECK  0x3C00U /* S10..S13: normally over black */
+#define LEFT_MARK_CHECK        0xC000U /* S14..S15: turn-mark-only area */
+#define RIGHT_MARK_CHECK       0x0003U /* S0..S1: turn-mark-only area */
 #define FRONT_MARK_CHECK 0x0004U
 
 #define STRAIGHT   0x0001

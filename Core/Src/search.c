@@ -11,10 +11,10 @@ static uint8_t s_route_save_pending;
 
 #define SEARCH_MENU_DELAY_MS 125U
 #define D_STR 1U
-#define D_45A 10U
-#define D_90A 30U
-#define D_180A 40U
-#define D_270A 50U
+#define D_45A 1U
+#define D_90A 1U
+#define D_180A 1U
+#define D_270A 1U
 #define LONG_DIST 2000U
 #define SHORT_DIST 400U
 #define MID_DIST 600U

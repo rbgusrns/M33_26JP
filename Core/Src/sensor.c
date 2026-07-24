@@ -8,11 +8,14 @@
 
 #define PID_KB 0.1116352117046f
 #define PID_KA (-0.776729576590f)
+#define CROSS_MIN_ACTIVE_PER_WING 3U
+#define CROSS_CONFIRM_FRAMES      2U
 #define SENSOR_EMITTER_PINS ((uint32_t)L0_Pin | (uint32_t)L1_Pin | (uint32_t)L2_Pin | (uint32_t)L3_Pin | \
                              (uint32_t)L4_Pin | (uint32_t)L5_Pin | (uint32_t)L6_Pin | (uint32_t)L7_Pin)
 
 static volatile uint8_t g_u8_adc_step;
 static volatile uint8_t g_u8_sensor_scan_started;
+static uint8_t s_cross_confirm_count;
 
 typedef struct {
     led_pin_t led;
@@ -29,14 +32,6 @@ static const scan_step_t scan_table[SEN_NUM] = {
     { { L5_GPIO_Port, L5_Pin }, 5U, 13U },
     { { L6_GPIO_Port, L6_Pin }, 6U, 14U },
     { { L7_GPIO_Port, L7_Pin }, 7U, 15U },
-};
-
-static const uint16_t state_table[18] = {
-    0xF000U, 0xF000U, 0xF000U, 0xF000U,
-    0x7800U, 0x3C00U, 0x1E00U, 0x0F00U,
-    0x0780U, 0x03C0U, 0x01E0U, 0x00F0U,
-    0x0078U, 0x003CU, 0x001EU, 0x000FU,
-    0x000FU, 0x000FU
 };
 
 static void cross_check(void);
@@ -88,6 +83,7 @@ void sen_vari_init(void)
     g_u16_pos_cnt = 6U;
     g_u16_sen_enable = 0xFFFFU;
     g_u16_sen_state = 0U;
+    s_cross_confirm_count = 0U;
 
     for (i = 0U; i < ADC_NUM; i++) {
         g_sen[i].fp32_4095_min_value = 0.0f;
@@ -265,6 +261,9 @@ static float sensor_clampf(float value, float min_value, float max_value)
 
 void make_position(void)
 {
+    const uint8_t line_detected =
+        ((g_pos.u16_state & LINE_TRACK_CHECK) != 0U) ? 1U : 0U;
+
     g_pos.fp32_sensor_sum = 0.0f;
     g_pos.fp32_weighted_sum = 0.0f;
 
@@ -274,12 +273,11 @@ void make_position(void)
     g_pos.fp32_sensor_sum += g_sen[g_u16_pos_cnt + 3].fp32_127_value;
 
     g_pos.fp32_position_sum = g_pos.fp32_sensor_sum;
+    g_Flag.lineout_flag = (line_detected != 0U) ? OFF : ON;
+    cross_check();
 
     if( g_pos.fp32_sensor_sum > 0.0f )
     {
-        g_Flag.lineout_flag = OFF;
-        cross_check();
-
         g_pos.fp32_weighted_sum += g_sen[g_u16_pos_cnt + 0].fp32_weight * g_sen[g_u16_pos_cnt + 0].fp32_127_value;
         g_pos.fp32_weighted_sum += g_sen[g_u16_pos_cnt + 1].fp32_weight * g_sen[g_u16_pos_cnt + 1].fp32_127_value;
         g_pos.fp32_weighted_sum += g_sen[g_u16_pos_cnt + 2].fp32_weight * g_sen[g_u16_pos_cnt + 2].fp32_127_value;
@@ -295,8 +293,6 @@ void make_position(void)
         g_pos.fp32_temp_position = g_pos.fp32_temp_pos;
 
         position_enable();
-    } else {
-        g_Flag.lineout_flag = ON;
     }
 }
 
@@ -319,14 +315,6 @@ void position_PID(void)
     float pid_mix;
     const float center_step = HANDLE_CENTER / 250.0f;
     const float pid_step = g_pos.fp32_pid_out / 250.0f;
-    uint8_t fast_straight = 0U;
-
-    if ((g_Flag.fast_flag == ON) &&
-        (g_i32_mark_cnt >= 0) &&
-        (g_i32_mark_cnt < 256) &&
-        ((g_fast_info[g_i32_mark_cnt].u16_turn_dir & STRAIGHT) != 0U)) {
-        fast_straight = 1U;
-    }
 
     g_pos.fp32_pos_iir_puted = g_pos.fp32_pos_iir_puting;
     g_pos.fp32_pos_iir_puting = g_pos.fp32_temp_pos;
@@ -349,35 +337,9 @@ void position_PID(void)
     if (g_pos.fp32_pid_out > 0.0f) {
         g_fp32_right_handle_temp = (g_fp32_handle_dec_step * (center_step - pid_step)) + g_fp32_handle_dec_max;
         g_fp32_left_handle_temp = (g_fp32_handle_acc_step * (center_step + pid_step)) + g_fp32_handle_acc_max;
-
-        if ((g_Flag.fast_flag == OFF) && (g_fp32_right_handle_temp < 0.0f)) {
-            g_fp32_right_handle_temp = 0.0f;
-        } else if (fast_straight != 0U) {
-            if (g_fp32_left_handle_temp > MAX_SPEED_HANDLE) {
-                g_fp32_left_handle_temp = MAX_SPEED_HANDLE;
-            }
-            if (g_fp32_right_handle_temp < -MAX_SPEED_HANDLE) {
-                g_fp32_right_handle_temp = -MAX_SPEED_HANDLE;
-            }
-        } else if ((g_Flag.fast_flag == ON) && (g_fp32_right_handle_temp < -0.05f)) {
-            g_fp32_right_handle_temp = -0.05f;
-        }
     } else {
         g_fp32_right_handle_temp = (g_fp32_handle_acc_step * (center_step - pid_step)) + g_fp32_handle_acc_max;
         g_fp32_left_handle_temp = (g_fp32_handle_dec_step * (center_step + pid_step)) + g_fp32_handle_dec_max;
-
-        if ((g_Flag.fast_flag == OFF) && (g_fp32_left_handle_temp < 0.0f)) {
-            g_fp32_left_handle_temp = 0.0f;
-        } else if (fast_straight != 0U) {
-            if (g_fp32_right_handle_temp > MAX_SPEED_HANDLE) {
-                g_fp32_right_handle_temp = MAX_SPEED_HANDLE;
-            }
-            if (g_fp32_left_handle_temp < -MAX_SPEED_HANDLE) {
-                g_fp32_left_handle_temp = -MAX_SPEED_HANDLE;
-            }
-        } else if ((g_Flag.fast_flag == ON) && (g_fp32_left_handle_temp < -0.05f)) {
-            g_fp32_left_handle_temp = -0.05f;
-        }
     }
 
     g_fp32_left_handle = g_fp32_left_handle_temp;
@@ -386,66 +348,67 @@ void position_PID(void)
     g_rm.fp32_handle = g_fp32_right_handle;
 }
 
-static void mark_enable_shift(turnmark_t *pleft, turnmark_t *pright)
+static uint8_t active_sensor_count(uint16_t state, uint16_t mask)
 {
-    if ((g_u16_sen_enable & RIGHT_ENABLE) != 0U) {
-        pleft->u16_mark_enable = (uint16_t)(LEFT_MARK_CHECK << g_u16_sen_state);
-        pright->u16_mark_enable = (uint16_t)(RIGHT_MARK_CHECK << g_u16_sen_state);
-    } else if ((g_u16_sen_enable & LEFT_ENABLE) != 0U) {
-        pleft->u16_mark_enable = (uint16_t)(LEFT_MARK_CHECK >> g_u16_sen_state);
-        pright->u16_mark_enable = (uint16_t)(RIGHT_MARK_CHECK >> g_u16_sen_state);
-    } else {
-        pleft->u16_mark_enable = LEFT_MARK_CHECK;
-        pright->u16_mark_enable = RIGHT_MARK_CHECK;
+    uint8_t count = 0U;
+
+    state &= mask;
+    while (state != 0U) {
+        state &= (uint16_t)(state - 1U);
+        count++;
     }
+
+    return count;
 }
 
 static void cross_check(void)
 {
-    uint16_t state;
+    const uint8_t low_wing_count =
+        active_sensor_count(g_pos.u16_state, CROSS_LOW_WING_CHECK);
+    const uint8_t high_wing_count =
+        active_sensor_count(g_pos.u16_state, CROSS_HIGH_WING_CHECK);
+    const uint8_t cross_pattern =
+        ((low_wing_count >= CROSS_MIN_ACTIVE_PER_WING) &&
+         (high_wing_count >= CROSS_MIN_ACTIVE_PER_WING)) ? 1U : 0U;
 
-    if ((g_u16_sen_enable & RIGHT_ENABLE) != 0U) {
-        state = (uint16_t)(9U - g_u16_sen_state);
-    } else if ((g_u16_sen_enable & LEFT_ENABLE) != 0U) {
-        state = (uint16_t)(9U + g_u16_sen_state);
-    } else {
-        state = 9U;
-    }
+    if (cross_pattern != 0U) {
+        if (s_cross_confirm_count < CROSS_CONFIRM_FRAMES) {
+            s_cross_confirm_count++;
+        }
 
-    if ((state < 1U) || (state > 16U)) {
-        return;
-    }
-
-    if (((g_pos.u16_state & state_table[state]) == state_table[state]) ||
-        ((g_pos.u16_state & state_table[state - 1U]) == state_table[state - 1U]) ||
-        ((g_pos.u16_state & state_table[state + 1U]) == state_table[state + 1U])) {
-        if (g_Flag.cross_flag == OFF) {
+        if ((g_Flag.cross_flag == OFF) &&
+            (s_cross_confirm_count >= CROSS_CONFIRM_FRAMES)) {
             g_Flag.cross_flag = ON;
             g_Flag.cross_shift = ON;
-        } else if (((g_lm.fp32_cross_check_dist + g_rm.fp32_cross_check_dist) * 0.5f) > 200.0f) {
+        } else if ((g_Flag.cross_flag == ON) &&
+                   (((g_lm.fp32_cross_check_dist + g_rm.fp32_cross_check_dist) * 0.5f) > 200.0f)) {
             g_Flag.lineout_flag = ON;
         }
-    } else if (g_Flag.cross_flag == ON) {
+    } else {
         const float cross_dist =
             (g_lm.fp32_cross_check_dist + g_rm.fp32_cross_check_dist) * 0.5f;
 
-        if (cross_dist > 50.0f) {
-            g_Flag.cross_shift = OFF;
-        }
+        s_cross_confirm_count = 0U;
 
-        if (cross_dist > 140.0f) {
-            g_Flag.cross_flag = OFF;
-            g_lmark.u16_turn_flag = OFF;
-            g_rmark.u16_turn_flag = OFF;
-            g_lmark.fp32_turnmark_dist = 0.0f;
-            g_rmark.fp32_turnmark_dist = 0.0f;
+        if (g_Flag.cross_flag == ON) {
+            if (cross_dist > 50.0f) {
+                g_Flag.cross_shift = OFF;
+            }
+
+            if (cross_dist > 140.0f) {
+                g_Flag.cross_flag = OFF;
+                g_lmark.u16_turn_flag = OFF;
+                g_rmark.u16_turn_flag = OFF;
+                g_lmark.fp32_turnmark_dist = 0.0f;
+                g_rmark.fp32_turnmark_dist = 0.0f;
+                g_lm.fp32_cross_check_dist = 0.0f;
+                g_rm.fp32_cross_check_dist = 0.0f;
+            }
+        } else {
+            g_Flag.cross_shift = OFF;
             g_lm.fp32_cross_check_dist = 0.0f;
             g_rm.fp32_cross_check_dist = 0.0f;
         }
-    } else {
-        g_Flag.cross_shift = OFF;
-        g_lm.fp32_cross_check_dist = 0.0f;
-        g_rm.fp32_cross_check_dist = 0.0f;
     }
 }
 
@@ -495,8 +458,6 @@ void turn_decide(turnmark_t *pmark, turnmark_t *premark)
 
         return;
     }
-
-    mark_enable_shift(&g_lmark, &g_rmark);
 
     if ((pmark->u16_mark_enable & g_pos.u16_state) != 0U) {
         if (pmark->u16_turn_flag == OFF) {

@@ -17,9 +17,8 @@
 #define SENSOR_STATE_THRESHOLD 60.0f
 #define POS_END 14500.0f
 #define HANDLE_CENTER 7250.0f
-#define MAX_SPEED_HANDLE 1.15f
-#define POS_KP_UP 0.7f
-#define POS_KD_UP 4.4f
+#define POS_KP_UP 1.5f
+#define POS_KD_UP 8.0f
 #define POS_KI_UP 0.0f
 
 typedef struct {
